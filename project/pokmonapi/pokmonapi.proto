@@ -1,0 +1,78 @@
+// Proto file for movie info service. Note this is gRPC proto syntax (not Go)
+syntax = "proto3";
+
+option go_package = "Project/pokmonapi";
+
+package pokmonapi;
+
+service PokmonInfo {
+	rpc GetMonsterInfo (MonsterName) returns (MonsterNames) {}        // user retrieving monsters from database
+	rpc SetMonsterInfo (MonsterName) returns (Status) {}              // user setting up team by adding monsters
+    rpc MonsterAttack (MonsterAction) returns (Status) {}             // user deciding monster's attack action
+	rpc JoinQueue (ReadyCheck) returns (Status) {}                    // user says their ready to play
+	//rpc LeaveQueue (ReadyCheck) returns (Status) {}                   // user wants to leave the queue because they scared 
+	rpc LeaveGame (ReadyCheck) returns (Status) {}                    // user wants to leave game *(might not need this)*
+	rpc SetUserName (UserName) returns (Status) {}                    // user set/sends name to server
+	//rpc SetCredentials (Credentials) returns (Status) {}              // user sets Credentials to server *(this is extra)* //uncomment credentials lne 47
+	rpc GetHealthPoints (HealthRequest) returns (HealthPoints) {}     // user requests the health points of their monster
+	rpc GetGameUnfo (RequestInfo) returns (GamesStatus) {}            // user requests opponent's name, monster, hp
+ 	rpc GetOpponentInfo (RequestInfo) returns (OpponentStatus) {}     // user requests opponent's hp, attack action
+}
+
+// The request message containing ONE monster name
+message MonsterName {
+	string monster = 1;
+}
+
+// The reply message containing multiple monster names
+message MonsterNames {
+	repeated string monsters = 1;
+}
+ 
+// The request message containing monster action
+message MonsterAction {
+    string action = 1;
+}
+
+// The message for yes or no questions
+message ReadyCheck {
+	bool check = 1;
+}
+
+// The message for setting UserName
+message UserName {
+	string name = 1;
+}
+
+// The message for logginging in
+/*message Credentials {
+	string name = 1;
+	string password = 2;
+}*/
+
+message HealthRequest {
+	string monsterHP = 1;
+}
+
+message HealthPoints {
+	int32 health = 1;
+}
+
+message GamesStatus {
+	string name = 1;
+	string monster = 2;
+	int32 health = 3;
+}
+
+message OpponentStatus {
+	int32 health = 1;
+	string action = 2;
+}
+
+message RequestInfo {
+	bool stats = 1;
+}
+
+message Status {
+	string code = 1;
+}
