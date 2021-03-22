@@ -7,7 +7,7 @@ package pokmonapi;
 
 service PokmonInfo {
 	rpc GetMonsterInfo (MonsterName) returns (MonsterNames) {}        // user retrieving monsters from database
-	rpc SetMonsterInfo (MonsterName) returns (Status) {}              // user setting up team by adding monsters
+	rpc SetMonsterInfo (UserAndName) returns (Status) {}              // user setting up team by adding monsters
     rpc MonsterAttack (MonsterAction) returns (Status) {}             // user deciding monster's attack action
 	rpc JoinQueue (ReadyCheck) returns (Status) {}                    // user says their ready to play
 	//rpc LeaveQueue (ReadyCheck) returns (Status) {}                   // user wants to leave the queue because they scared 
@@ -27,6 +27,12 @@ message MonsterName {
 // The reply message containing multiple monster names
 message MonsterNames {
 	repeated string monsters = 1;
+}
+
+// The request message containing username and monster name
+message UserAndName {
+	string name = 1;
+	string monster = 2;
 }
  
 // The request message containing monster action

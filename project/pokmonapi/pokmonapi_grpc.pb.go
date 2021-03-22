@@ -19,7 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PokmonInfoClient interface {
 	GetMonsterInfo(ctx context.Context, in *MonsterName, opts ...grpc.CallOption) (*MonsterNames, error)
-	SetMonsterInfo(ctx context.Context, in *MonsterName, opts ...grpc.CallOption) (*Status, error)
+	SetMonsterInfo(ctx context.Context, in *UserAndName, opts ...grpc.CallOption) (*Status, error)
 	MonsterAttack(ctx context.Context, in *MonsterAction, opts ...grpc.CallOption) (*Status, error)
 	JoinQueue(ctx context.Context, in *ReadyCheck, opts ...grpc.CallOption) (*Status, error)
 	//rpc LeaveQueue (ReadyCheck) returns (Status) {}                   // user wants to leave the queue because they scared
@@ -48,7 +48,7 @@ func (c *pokmonInfoClient) GetMonsterInfo(ctx context.Context, in *MonsterName, 
 	return out, nil
 }
 
-func (c *pokmonInfoClient) SetMonsterInfo(ctx context.Context, in *MonsterName, opts ...grpc.CallOption) (*Status, error) {
+func (c *pokmonInfoClient) SetMonsterInfo(ctx context.Context, in *UserAndName, opts ...grpc.CallOption) (*Status, error) {
 	out := new(Status)
 	err := c.cc.Invoke(ctx, "/pokmonapi.PokmonInfo/SetMonsterInfo", in, out, opts...)
 	if err != nil {
@@ -125,7 +125,7 @@ func (c *pokmonInfoClient) GetOpponentInfo(ctx context.Context, in *RequestInfo,
 // for forward compatibility
 type PokmonInfoServer interface {
 	GetMonsterInfo(context.Context, *MonsterName) (*MonsterNames, error)
-	SetMonsterInfo(context.Context, *MonsterName) (*Status, error)
+	SetMonsterInfo(context.Context, *UserAndName) (*Status, error)
 	MonsterAttack(context.Context, *MonsterAction) (*Status, error)
 	JoinQueue(context.Context, *ReadyCheck) (*Status, error)
 	//rpc LeaveQueue (ReadyCheck) returns (Status) {}                   // user wants to leave the queue because they scared
@@ -145,7 +145,7 @@ type UnimplementedPokmonInfoServer struct {
 func (UnimplementedPokmonInfoServer) GetMonsterInfo(context.Context, *MonsterName) (*MonsterNames, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMonsterInfo not implemented")
 }
-func (UnimplementedPokmonInfoServer) SetMonsterInfo(context.Context, *MonsterName) (*Status, error) {
+func (UnimplementedPokmonInfoServer) SetMonsterInfo(context.Context, *UserAndName) (*Status, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetMonsterInfo not implemented")
 }
 func (UnimplementedPokmonInfoServer) MonsterAttack(context.Context, *MonsterAction) (*Status, error) {
@@ -201,7 +201,7 @@ func _PokmonInfo_GetMonsterInfo_Handler(srv interface{}, ctx context.Context, de
 }
 
 func _PokmonInfo_SetMonsterInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(MonsterName)
+	in := new(UserAndName)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func _PokmonInfo_SetMonsterInfo_Handler(srv interface{}, ctx context.Context, de
 		FullMethod: "/pokmonapi.PokmonInfo/SetMonsterInfo",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PokmonInfoServer).SetMonsterInfo(ctx, req.(*MonsterName))
+		return srv.(PokmonInfoServer).SetMonsterInfo(ctx, req.(*UserAndName))
 	}
 	return interceptor(ctx, in, info, handler)
 }
