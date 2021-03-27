@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net"
+	"fmt"
 
 	"project/pokmonapi"
 
@@ -32,11 +33,14 @@ type userID struct {
 }
 
 type gameID struct {
-	userFirst     userID
-	userSecond    userID
-	monsterFirst  monsterID
-	monsterSecond monsterID
-	whoseTurn     string
+	users                [2]userID
+	currentMonsterHealth [2]int32
+	whoseTurn            string
+}
+
+type queueID struct {
+	userNames []string
+	length    int
 }
 
 type database struct {
@@ -49,12 +53,13 @@ type server struct {
 	pokmonapi.UnimplementedPokmonInfoServer
 }
 
-var monsterNamesDB []string = []string{"Bulbasaur", "Charmander", "Squirtle", "Chikorita", "Cyndaquil", "Totodile", "Treecko", "Torchic", "Mudkip", "Turtwig", "Chimchar", "Piplup"}
-var monsterAttackDB [][]string = [][]string{{"Leaf Blade", "Energy Ball", "Apple Acid"}, {"Flamethrower", "Blaze Kick", "Searing Shot"}, {"Hydro Cannon", "Surf", "Water Shuriken"}}
-var monsterHealthDB []int32 = []int32{90, 78, 88, 90, 78, 88, 80, 90, 100, 110, 88, 106} // twice the amount they had in pokemon
-var monsterElementDB []string = []string{"Grass", "Fire", "Water"}
+var monsterNamesDB   []string   = []string{"B", "Charmander", "Squirtle", "Chikorita", "Cyndaquil", "Totodile", "Treecko", "Torchic", "Mudkip", "Turtwig", "Chimchar", "Piplup"}
+var monsterAttackDB  [][]string = [][]string{{"Leaf Blade", "Energy Ball", "Apple Acid", "tackle"}, {"Flamethrower", "Blaze Kick", "Searing Shot", "tackle"}, {"Hydro Cannon", "Surf", "Water Shuriken", "tackle"}}
+var monsterHealthDB  []int32    = []int32{90, 78, 88, 90, 78, 88, 80, 90, 100, 110, 88, 106} // twice the amount they had in pokemon
+var monsterElementDB []string   = []string{"Grass", "Fire", "Water"}
 
 var pokmonDB database = database{}
+var queue queueID = queueID{}
 
 func (s *server) SetUserName(ctx context.Context, in *pokmonapi.UserName) (*pokmonapi.Status, error) {
 	name := in.GetName()
@@ -99,31 +104,110 @@ func (s *server) SetMonsterInfo(ctx context.Context, in *pokmonapi.UserAndName) 
 	monster := in.GetMonster()
 	status := &pokmonapi.Status{}
 
-	if value, ok := pokmonDB.users[name]; ok {
-		if value.monsterName == "new"{
-			tempMonsterID := monsterID{monsterName: monster,attributes: pokmonDB.monsters[monster]}
-			pokmonDB.users[name] = tempMonsterID
+	if _, ok := pokmonDB.monsters[monster]; ok {
+		if value, ok := pokmonDB.users[name]; ok {
+			if value.monsterName == "new"{
+				tempMonsterID := monsterID{monsterName: monster,attributes: pokmonDB.monsters[monster]}
+				pokmonDB.users[name] = tempMonsterID
 
-			status.Code = "Added monster to your team"
+				status.Code = "Added monster to your team"
 
-			return status, nil
+				return status, nil
+			} else {
+				status.Code = "Username already has monster"
+
+				return status, errors.New("Username already has mosnter")
+			}
 		} else {
-			status.Code = "Username already has monster"
+			status.Code = "Username not in database"
 
-			return status, errors.New("Username already has mosnter")
+			return status, errors.New("Unable to add mosnter. Username not in database")
 		}
 	} else {
-		status.Code = "Username not in database"
+		status.Code = "Monster not in database"
 
-		return status, errors.New("Unable to add mosnter. Username not in database")
+		return status, errors.New("Unable to add mosnter. Monster not in database")
 	}
+}
+
+func (s *server) JoinQueue(ctx context.Context, in *pokmonapi.UserName) (*pokmonapi.Status, error) {
+	name := in.GetName()
+	status := &pokmonapi.Status{}
+
+	for i := 0; i < queue.length; i++ {
+		if queue.userNames[i] == name {
+			status.Code = "Username is already in the Queue"
+
+			return status, errors.New("Username is already in the Queue")
+		}
+	}
+
+	queue.userNames = append(queue.userNames, name)
+	queue.length = queue.length + 1
+
+	status.Code = "Added to the Queue"
+
+	return status, nil
+}
+
+func (s *server) GetHealthPoints(ctx context.Context, in *pokmonapi.HealthRequest) (*pokmonapi.HealthPoints, error) {
+
+	healthPoints := &pokmonapi.HealthPoints{}
+
+	return healthPoints, nil
+}
+
+func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*pokmonapi.GameStatus, error) {
+	gameStatus := &pokmonapi.GameStatus{}
+
+	if queue.length >= 2 {
+		gameStatus.Code = "Game created"
+
+		tempGame := gameID{}
+		tempGame.users[0] = pokmonDB.users[queue.userNames[0]]
+		tempGame.users[1] = pokmonDB.users[queue.userNames[1]]
+		tempGame.currentMonsterHealth[0] = tempGame.users[0].monster.attributes.healthPoint
+		tempGame.currentMonsterHealth[1] = tempGame.users[1].monster.attributes.healthPoint
+		tempGame.whoseTurn = queue.userNames[0]
+
+		pokmonDB.games = append(pokmonDB.games, tempGame)
+
+		remove(queue.users, 0)
+		queue.length = queue.length - 1
+		remove(queue.users, 0)
+		queue.length = queue.length - 1
+
+		fmt.Printf("queue Length: %d", queue.length)
+
+		return gameStatus, nil
+	} else { 
+		gameStatus.Code = "Game not created. Waiting on opponent"
+		return gameStatus, errors.New("Game not created. Waiting on opponent")
+	}
+}
+
+func (s *server) GetOpponentInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*pokmonapi.OpponentStatus, error) {
+
+	opponentStatus := &pokmonapi.OpponentStatus{}
+
+	return opponentStatus, nil
+}
+
+func (s *server) MonsterAttack(ctx context.Context, in *pokmonapi.MonsterAction) (*pokmonapi.Status, error) {
+
+	status := &pokmonapi.Status{}
+
+	return status, nil
+}
+
+func remove(slice []int, index int) []int {
+    return append(slice[:index], slice[index+1:]...)
 }
 
 func main() {
 	// initialize the database maps
 	pokmonDB.users = make(map[string]monsterID)
 	pokmonDB.monsters = make(map[string]monsterStats)
-	
 
 	// initialize the monster database
 	var tempStats monsterStats

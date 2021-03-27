@@ -1,7 +1,7 @@
 // Proto file for movie info service. Note this is gRPC proto syntax (not Go)
 syntax = "proto3";
 
-option go_package = "Project/pokmonapi";
+option go_package = "project/pokmonapi";
 
 package pokmonapi;
 
@@ -9,13 +9,13 @@ service PokmonInfo {
 	rpc GetMonsterInfo (MonsterName) returns (MonsterNames) {}        // user retrieving monsters from database
 	rpc SetMonsterInfo (UserAndName) returns (Status) {}              // user setting up team by adding monsters
     rpc MonsterAttack (MonsterAction) returns (Status) {}             // user deciding monster's attack action
-	rpc JoinQueue (ReadyCheck) returns (Status) {}                    // user says their ready to play
-	//rpc LeaveQueue (ReadyCheck) returns (Status) {}                   // user wants to leave the queue because they scared 
-	rpc LeaveGame (ReadyCheck) returns (Status) {}                    // user wants to leave game *(might not need this)*
+	rpc JoinQueue (UserName) returns (Status) {}                      // user says their ready to play
+	//rpc LeaveQueue (UserName) returns (Status) {}                     // user wants to leave the queue because they scared 
+	rpc LeaveGame (UserName) returns (Status) {}                      // user wants to leave game *(might not need this)*
 	rpc SetUserName (UserName) returns (Status) {}                    // user set/sends name to server
 	//rpc SetCredentials (Credentials) returns (Status) {}              // user sets Credentials to server *(this is extra)* //uncomment credentials lne 47
 	rpc GetHealthPoints (HealthRequest) returns (HealthPoints) {}     // user requests the health points of their monster
-	rpc GetGameUnfo (RequestInfo) returns (GamesStatus) {}            // user requests opponent's name, monster, hp
+	rpc GetGameInfo (RequestInfo) returns (GameStatus) {}             // user requests opponent's name, monster, hp
  	rpc GetOpponentInfo (RequestInfo) returns (OpponentStatus) {}     // user requests opponent's hp, attack action
 }
 
@@ -37,12 +37,8 @@ message UserAndName {
  
 // The request message containing monster action
 message MonsterAction {
-    string action = 1;
-}
-
-// The message for yes or no questions
-message ReadyCheck {
-	bool check = 1;
+	string name = 1;
+    string action = 2;
 }
 
 // The message for setting UserName
@@ -64,19 +60,21 @@ message HealthPoints {
 	int32 health = 1;
 }
 
-message GamesStatus {
-	string name = 1;
-	string monster = 2;
-	int32 health = 3;
+message GameStatus {
+	string opponentName = 1;
+	string opponentMonster = 2;
+	int32  opponentHealth = 3;
+	string Code = 4;
 }
 
 message OpponentStatus {
-	int32 health = 1;
-	string action = 2;
+	string name = 1;
+	int32  health = 2;
+	string action = 3;
 }
 
 message RequestInfo {
-	bool stats = 1;
+	string name = 1;
 }
 
 message Status {
