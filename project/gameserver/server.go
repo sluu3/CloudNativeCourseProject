@@ -58,7 +58,7 @@ type server struct {
 }
 
 var monsterNamesDB       []string   = []string{"Bulbasaur", "Charmander", "Squirtle", "Chikorita", "Cyndaquil", "Totodile", "Treecko", "Torchic", "Mudkip", "Turtwig", "Chimchar", "Piplup"}
-var monsterAttackDB      [][]string = [][]string{{"Leaf Blade", "Energy Ball", "Apple Acid", "tackle"}, {"Flamethrower", "Blaze Kick", "Searing Shot", "tackle"}, {"Hydro Cannon", "Surf", "Water Shuriken", "tackle"}}
+var monsterAttackDB      [][]string = [][]string{{"Leaf blade", "Energy ball", "Apple acid", "Tackle"}, {"Flamethrower", "Blaze kick", "Searing shot", "Tackle"}, {"Hydro cannon", "Surf", "Water ball", "Tackle"}}
 var attackPowerDB 		 map[string]int32
 var monsterHealthDB      []int32    = []int32{90, 78, 88, 90, 78, 88, 80, 90, 100, 110, 88, 106} // twice the amount they had in pokemon
 var monsterElementDB     []string   = []string{"Grass", "Fire", "Water"}
@@ -75,11 +75,11 @@ func (s *server) SetUserName(ctx context.Context, in *pokmonapi.UserName) (*pokm
 		if value.monsterName == "new"{
 			status.Code = "Username in system. Enter monster"
 
-			return status, errors.New("Username already in system. No monster")
+			return status, nil
 		} else {
 			status.Code = "Username in system. Does not need to enter monster"
 
-			return status, errors.New("Username already in system. Has mosnter already")
+			return status, nil
 		}
 	} else {
 		tempAttributes := monsterStats{attackMoves: []string{"none"}, healthPoint: 0, elementType: "none"}
@@ -94,11 +94,6 @@ func (s *server) SetUserName(ctx context.Context, in *pokmonapi.UserName) (*pokm
 
 func (s *server) GetMonsterInfo(ctx context.Context, in *pokmonapi.MonsterName) (*pokmonapi.MonsterNames, error) {
 	monsterNames := &pokmonapi.MonsterNames{}
-
-	// var tempStr string
-	// for _, s := range monsterNamesDB {
-	// 	tempStr += " " + s
-	// }
 
 	monsterNames.Monsters = monsterNamesDB
 
@@ -122,7 +117,7 @@ func (s *server) SetMonsterInfo(ctx context.Context, in *pokmonapi.UserAndName) 
 			} else {
 				status.Code = "Username already has monster"
 
-				return status, errors.New("Username already has mosnter")
+				return status, nil
 			}
 		} else {
 			status.Code = "Username not in database"
@@ -147,7 +142,7 @@ func (s *server) JoinQueue(ctx context.Context, in *pokmonapi.UserName) (*pokmon
 			return status, errors.New("Username is already in the Queue")
 		}
 	}
-
+	
 	queue.userNames = append(queue.userNames, name)
 	queue.length = queue.length + 1
 
@@ -220,10 +215,19 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 		gameStatus.WhoseTurn = queue.userNames[0]
 		gameStatus.Uuid = gameUUID
 
-		remove(queue.userNames, 0)
-		queue.length = queue.length - 1
-		remove(queue.userNames, 0)
-		queue.length = queue.length - 1 
+		// remove the first user from the queue
+		if queue.length > 1 {
+			queue.userNames = queue.userNames[1:queue.length]
+			queue.length = queue.length - 1
+		}
+		// remove the next person from the queue, check to see if there is more than one perosn left 
+		if queue.length > 1 {
+			queue.userNames = queue.userNames[1:queue.length]
+			queue.length = queue.length - 1
+		} else {
+			queue.userNames = make([]string, 0)
+			queue.length = 0
+		}
 
 		return gameStatus, nil
 	} else { 
@@ -252,6 +256,11 @@ func (s *server) GetHealthPoints(ctx context.Context, in *pokmonapi.HealthReques
 
 		healthPoints.WhoseTurn = value.whoseTurn
 
+		// delete the game if someone has hit zero HP
+		if value.currentMonsterHealth[1] == int32(0) || value.currentMonsterHealth[0] == int32(0) {
+			delete(pokmonDB.games, game)
+		}
+
 		return healthPoints, nil
 	} else {
 		return healthPoints, errors.New("Error getting Health and whose turn")
@@ -264,18 +273,36 @@ func (s *server) MonsterAttack(ctx context.Context, in *pokmonapi.MonsterAction)
 	game := in.GetUuid()
 	healthPoints := &pokmonapi.HealthPoints{}
 
+	rand.Seed(time.Now().UnixNano())
+
 	if value, ok := pokmonDB.games[game]; ok {
-		randMax := int(attackPowerDB[action])
+		var randMax int
+		if name != value.users[0].userName {
+			randMax = elementDamage(value.users[1].monster.attributes.elementType, value.users[0].monster.attributes.elementType, action)
+		} else {
+			randMax = elementDamage(value.users[0].monster.attributes.elementType, value.users[1].monster.attributes.elementType, action)
+		}
+
 		healthLoss := int32(rand.Intn(randMax))
 		healthLoss = int32(rand.Intn(randMax))
 		healthLoss = int32(rand.Intn(randMax))
 
 		if name != value.users[0].userName {
-			value.currentMonsterHealth[0] = value.currentMonsterHealth[0] - healthLoss
+			var tempHealth int32 = value.currentMonsterHealth[0] - healthLoss
+			if tempHealth < 0 {
+				value.currentMonsterHealth[0] = 0
+			} else { 
+				value.currentMonsterHealth[0] = tempHealth
+			}
 			healthPoints.Health = value.currentMonsterHealth[0]
 			value.whoseTurn = value.users[0].userName
 		} else {
-			value.currentMonsterHealth[1] = value.currentMonsterHealth[1] - healthLoss
+			var tempHealth int32 = value.currentMonsterHealth[1] - healthLoss
+			if tempHealth < 0 {
+				value.currentMonsterHealth[1] = 0
+			} else { 
+				value.currentMonsterHealth[1] = tempHealth
+			}
 			healthPoints.Health = value.currentMonsterHealth[1]
 			value.whoseTurn = value.users[1].userName
 		}
@@ -306,8 +333,40 @@ func (s *server) GetOpponentInfo(ctx context.Context, in *pokmonapi.RequestInfo)
 	return opponentStatus, nil
 }
 
-func remove(slice []string, index int) []string {
-    return append(slice[:index], slice[index+1:]...)
+func elementDamage(myType string, oppType string, action string) int{
+	switch myType {
+	case "Grass":
+		switch oppType {
+		case "Grass":
+			return int(attackPowerDB[action])
+		case "Fire":
+			return int(attackPowerDB[action])/2
+		case "Water":
+			return int(attackPowerDB[action])*2
+		}
+	case "Fire":
+		switch oppType {
+		case "Grass":
+			return int(attackPowerDB[action])*2
+		case "Fire":
+			return int(attackPowerDB[action])
+		case "Water":
+			return int(attackPowerDB[action])/2
+		}
+	case "Water":
+		switch oppType {
+		case "Grass":
+			return int(attackPowerDB[action])/2
+		case "Fire":
+			return int(attackPowerDB[action])*2
+		case "Water":
+			return int(attackPowerDB[action])
+		}
+	default:
+		return 0
+	}
+	
+	return 0
 }
 
 func main() {
