@@ -8,7 +8,7 @@ package pokmonapi;
 service PokmonInfo {
 	rpc GetMonsterInfo (MonsterName) returns (MonsterNames) {}        // user retrieving monsters from database
 	rpc SetMonsterInfo (UserAndName) returns (Status) {}              // user setting up team by adding monsters
-    rpc MonsterAttack (MonsterAction) returns (Status) {}             // user deciding monster's attack action
+    rpc MonsterAttack (MonsterAction) returns (HealthPoints) {}     // user deciding monster's attack action
 	rpc JoinQueue (UserName) returns (Status) {}                      // user says their ready to play
 	//rpc LeaveQueue (UserName) returns (Status) {}                     // user wants to leave the queue because they scared 
 	rpc LeaveGame (UserName) returns (Status) {}                      // user wants to leave game *(might not need this)*
@@ -17,6 +17,7 @@ service PokmonInfo {
 	rpc GetHealthPoints (HealthRequest) returns (HealthPoints) {}     // user requests the health points of their monster
 	rpc GetGameInfo (RequestInfo) returns (GameStatus) {}             // user requests opponent's name, monster, hp
  	rpc GetOpponentInfo (RequestInfo) returns (OpponentStatus) {}     // user requests opponent's hp, attack action
+	rpc GetActionInfo (RequestInfo) returns (AttackActions) {}       // user requests attack actions
 }
 
 // The request message containing ONE monster name
@@ -39,6 +40,7 @@ message UserAndName {
 message MonsterAction {
 	string name = 1;
     string action = 2;
+	string uuid = 3;
 }
 
 // The message for setting UserName
@@ -53,18 +55,23 @@ message UserName {
 }*/
 
 message HealthRequest {
-	string monsterHP = 1;
+	string name = 1;
+	string uuid = 2;
 }
 
 message HealthPoints {
 	int32 health = 1;
+	string whoseTurn = 2;
 }
 
 message GameStatus {
 	string opponentName = 1;
 	string opponentMonster = 2;
 	int32  opponentHealth = 3;
-	string Code = 4;
+	string whoseTurn = 4;
+	int32 myHealth = 5;
+	string code = 6;
+	string uuid = 7;	
 }
 
 message OpponentStatus {
@@ -75,6 +82,10 @@ message OpponentStatus {
 
 message RequestInfo {
 	string name = 1;
+}
+
+message AttackActions {
+	repeated string actions = 1;
 }
 
 message Status {
