@@ -40,7 +40,7 @@ message UserAndName {
 message MonsterAction {
 	string name = 1;
     string action = 2;
-	string uuid = 3;
+	string gameID = 3;
 }
 
 // The message for setting UserName
@@ -56,12 +56,14 @@ message UserName {
 
 message HealthRequest {
 	string name = 1;
-	string uuid = 2;
+	string gameID = 2;
 }
 
 message HealthPoints {
 	int32 health = 1;
 	string whoseTurn = 2;
+	string lastAttack = 3;
+	int32 damage = 4;
 }
 
 message GameStatus {
@@ -70,8 +72,9 @@ message GameStatus {
 	int32  opponentHealth = 3;
 	string whoseTurn = 4;
 	int32 myHealth = 5;
-	string code = 6;
-	string uuid = 7;	
+	string myMonster = 6;
+	string code = 7;
+	string gameID = 8;	
 }
 
 message OpponentStatus {

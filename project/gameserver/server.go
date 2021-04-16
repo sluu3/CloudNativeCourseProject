@@ -5,18 +5,22 @@ import (
 	"errors"
 	"log"
 	"net"
-	"strings"
 	"math/rand"
 	"time"
+	"fmt"
 
 	"project/pokmonapi"
 
 	"google.golang.org/grpc"
-	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson"
+    "go.mongodb.org/mongo-driver/bson/primitive"
+    "go.mongodb.org/mongo-driver/mongo"
+    "go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
 	port = ":50051"
+	mongodbEndpoint = "mongodb://172.17.0.2:27017" // Find this from the Mongo container
 )
 
 type monsterStats struct {
@@ -53,49 +57,117 @@ type database struct {
 	monsters map[string]monsterStats
 }
 
+type userDatabase struct {
+	ID          primitive.ObjectID `bson:"_id"`
+	User        string             `bson:"user"`
+	Monster     string             `bson:"monster"`
+	AttackMoves []string           `bson:"attack_moves"`
+	Health      int                `bson:"health"`
+	Element     string             `bson:"element"`
+	CreatedAt   time.Time          `bson:"created_at"`
+	UpdatedAt   time.Time          `bson:"updated_at"`
+}
+
+type gameDatabase struct {
+	ID            primitive.ObjectID `bson:"_id"`
+	User1         string             `bson:"user1"`
+	User2         string             `bson:"user2"`
+	Health1       int                `bson:"health1"`
+	Health2       int                `bson:"health2"`
+	WhoseTurn     string             `bson:"whose_turn"`
+	LastAttack    string             `bson:"last_attack"`
+	CreatedAt     time.Time          `bson:"created_at"`
+	UpdatedAt     time.Time          `bson:"updated_at"`
+}
+
+type monsterDatabase struct {
+	ID          primitive.ObjectID `bson:"_id"`
+	Monster     string             `bson:"monster"`
+	AttackMoves []string           `bson:"attack_moves"`
+	Health      int                `bson:"health"`
+	Element     string             `bson:"element"`
+	CreatedAt   time.Time          `bson:"created_at"`
+	UpdatedAt   time.Time          `bson:"updated_at"`
+}
+
 type server struct {
 	pokmonapi.UnimplementedPokmonInfoServer
 }
 
-var monsterNamesDB       []string   = []string{"Bulbasaur", "Charmander", "Squirtle", "Chikorita", "Cyndaquil", "Totodile", "Treecko", "Torchic", "Mudkip", "Turtwig", "Chimchar", "Piplup"}
 var monsterAttackDB      [][]string = [][]string{{"Leaf blade", "Energy ball", "Apple acid", "Tackle"}, {"Flamethrower", "Blaze kick", "Searing shot", "Tackle"}, {"Hydro cannon", "Surf", "Water ball", "Tackle"}}
-var attackPowerDB 		 map[string]int32
-var monsterHealthDB      []int32    = []int32{90, 78, 88, 90, 78, 88, 80, 90, 100, 110, 88, 106} // twice the amount they had in pokemon
-var monsterElementDB     []string   = []string{"Grass", "Fire", "Water"}
-var attackpower          []int32    = []int32{40, 40, 40, 30}
+var attackpower          []int      = []int{40, 40, 40, 30}
+var attackPowerDB 		 map[string]int
 
-var pokmonDB database = database{}
 var queue queueID = queueID{}
+
+var client *mongo.Client
 
 func (s *server) SetUserName(ctx context.Context, in *pokmonapi.UserName) (*pokmonapi.Status, error) {
 	name := in.GetName()
 	status := &pokmonapi.Status{}
 
-	if value, ok := pokmonDB.users[name]; ok {
-		if value.monsterName == "new"{
-			status.Code = "Username in system. Enter monster"
+	// select collection from database
+	col := client.Database("Pokmon").Collection("users")
 
-			return status, nil
-		} else {
-			status.Code = "Username in system. Does not need to enter monster"
+	// filter user tagged as specified name
+	filter := bson.M{"user": bson.M{"$eq": name}}
 
-			return status, nil
-		}
-	} else {
-		tempAttributes := monsterStats{attackMoves: []string{"none"}, healthPoint: 0, elementType: "none"}
-		tempMonsterID  := monsterID{monsterName: "new", attributes: tempAttributes}
-		pokmonDB.users[name] = tempMonsterID
+	// find one user
+	var filterUser userDatabase
+	err := col.FindOne(context.TODO(), filter).Decode(&filterUser)
+
+	if err != nil { // user not found in system
+    	// Insert one user
+		col.InsertOne(context.TODO(), &userDatabase{
+			ID:          primitive.NewObjectID(),
+			User:        name,
+			Monster:     "new",
+			CreatedAt:   time.Now(),
+		})
 
 		status.Code = "Set User name. Need monster name"
 
 		return status, nil
+	} else { // user found in system
+		if filterUser.Monster == "new"{ // never added monster to their team
+			status.Code = "Username in system. Enter monster"
+
+			return status, nil
+		} else { // added monster to team already
+			status.Code = "Username in system. Does not need to enter monster"
+
+			return status, nil
+		}
 	}
 }
 
 func (s *server) GetMonsterInfo(ctx context.Context, in *pokmonapi.MonsterName) (*pokmonapi.MonsterNames, error) {
 	monsterNames := &pokmonapi.MonsterNames{}
 
-	monsterNames.Monsters = monsterNamesDB
+	var monsterNameSlice []string
+
+	// select collection from database
+	col := client.Database("Pokmon").Collection("monsters")
+
+	foundMonsters, err := col.Find(context.TODO(), bson.D{})
+	if err != nil {
+
+		return monsterNames, errors.New("Unable to display the monsters")
+	}
+
+	// Map found monters to an array of monster names 
+	for foundMonsters.Next(context.TODO()) {
+		monsters := monsterDatabase{}
+		err := foundMonsters.Decode(&monsters)
+		if err != nil {
+			// no monster was found
+		} else {
+			// save mosnter names to array here
+			monsterNameSlice = append(monsterNameSlice, monsters.Monster)
+		}
+	}
+
+	monsterNames.Monsters = monsterNameSlice
 
 	return monsterNames, nil
 }
@@ -105,32 +177,62 @@ func (s *server) SetMonsterInfo(ctx context.Context, in *pokmonapi.UserAndName) 
 	monster := in.GetMonster()
 	status := &pokmonapi.Status{}
 
-	if _, ok := pokmonDB.monsters[monster]; ok {
-		if value, ok := pokmonDB.users[name]; ok {
-			if value.monsterName == "new"{
-				tempMonsterID := monsterID{monsterName: monster,attributes: pokmonDB.monsters[monster]}
-				pokmonDB.users[name] = tempMonsterID
+	// select collection from database
+	colUsers := client.Database("Pokmon").Collection("users")
+	colMonsters := client.Database("Pokmon").Collection("monsters")
 
-				status.Code = "Added monster to your team"
+	// filters for the databases
+	userFilter := bson.M{"user": bson.M{"$eq": name}}
+	monsterFilter := bson.M{"monster": bson.M{"$eq": monster}}
 
-				return status, nil
+	// find one user and one monster
+	var filterUser userDatabase
+	var filterMonster monsterDatabase
+	
+	if errM := colMonsters.FindOne(context.TODO(), monsterFilter).Decode(&filterMonster); errM == nil {
+		// the mosnter is in the database
+		if errU := colUsers.FindOne(context.TODO(), userFilter).Decode(&filterUser); errU == nil {
+			// user is in database
+			if filterUser.Monster == "new" {
+				// new user needs to add mosnter
+				// upadter for specified item and price
+				updater := bson.M{"$set": bson.M{"monster": filterMonster.Monster, "attack_moves": filterMonster.AttackMoves, "health": filterMonster.Health, "element": filterMonster.Element, "updated_at": time.Now()}}
+
+				//Perform UpdateOne operation & validate against the error.
+				_, err := colUsers.UpdateOne(context.TODO(), userFilter, updater)
+
+				if err != nil {
+					// unable to update item, could not find the user
+					status.Code = "Unable to add monster to your team"
+
+					return status, errors.New("Unable to add monster to your team")
+				} else {
+					// successfully added user monster attributes to the user's database
+					status.Code = "Added monster to your team"
+
+					return status, nil
+				}
 			} else {
+				// user already has a monster
 				status.Code = "Username already has monster"
 
 				return status, nil
 			}
 		} else {
+			// user not in database
 			status.Code = "Username not in database"
 
 			return status, errors.New("Unable to add mosnter. Username not in database")
 		}
 	} else {
+		// no monster in database
 		status.Code = "Monster not in database"
 
 		return status, errors.New("Unable to add mosnter. Monster not in database")
 	}
 }
 
+// mutex? race condition could happen here
 func (s *server) JoinQueue(ctx context.Context, in *pokmonapi.UserName) (*pokmonapi.Status, error) {
 	name := in.GetName()
 	status := &pokmonapi.Status{}
@@ -155,114 +257,264 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 	name := in.GetName()
 	gameStatus := &pokmonapi.GameStatus{}
 
-	for _, value := range pokmonDB.games {
-		if name == pokmonDB.games[value.gameUuid].users[0].userName || name == pokmonDB.games[value.gameUuid].users[1].userName {
-			gameStatus.Code = "Game created"
+	// select collection from database
+	colUsers := client.Database("Pokmon").Collection("users")
+	colGames := client.Database("Pokmon").Collection("games")
 
-			if name != pokmonDB.games[value.gameUuid].users[0].userName {
-				gameStatus.OpponentName = pokmonDB.games[value.gameUuid].users[0].userName
-				gameStatus.OpponentMonster = pokmonDB.users[pokmonDB.games[value.gameUuid].users[0].userName].monsterName
-				gameStatus.OpponentHealth = pokmonDB.games[value.gameUuid].currentMonsterHealth[0]
-				gameStatus.MyHealth = pokmonDB.games[value.gameUuid].currentMonsterHealth[1]
-			} else {
-				gameStatus.OpponentName = pokmonDB.games[value.gameUuid].users[0].userName
-				gameStatus.OpponentMonster = pokmonDB.users[pokmonDB.games[value.gameUuid].users[0].userName].monsterName
-				gameStatus.OpponentHealth = pokmonDB.games[value.gameUuid].currentMonsterHealth[1]
-				gameStatus.MyHealth = pokmonDB.games[value.gameUuid].currentMonsterHealth[0]
+	// filters for the databases
+	user1Filter := bson.M{"user": bson.M{"$eq": name}}
+	gameFilter1 := bson.M{"user1": bson.M{"$eq": name}}
+	gameFilter2 := bson.M{"user2": bson.M{"$eq": name}}
+
+	// find one user and one monster
+	var filterUser1 userDatabase
+	var filterUser2 userDatabase
+	var filterGame  gameDatabase
+
+	// checking to see if the user is already in a game
+	if errG := colGames.FindOne(context.TODO(), gameFilter1).Decode(&filterGame); errG == nil {
+		// user is in a game, find user information
+		if name != filterGame.User1 {
+			user2Filter := bson.M{"user": bson.M{"$eq": filterGame.User1}}
+			errU := colUsers.FindOne(context.TODO(), user2Filter).Decode(&filterUser2)
+			errU = colUsers.FindOne(context.TODO(), user1Filter).Decode(&filterUser1)
+			if errU == nil {
+				// found user 2
+				gameStatus.OpponentName = filterGame.User1
+				gameStatus.OpponentMonster = filterUser2.Monster
+				gameStatus.OpponentHealth = int32(filterGame.Health1)
+				gameStatus.MyHealth = int32(filterGame.Health2)
+				gameStatus.MyMonster = filterUser1.Monster
+				gameStatus.WhoseTurn = filterGame.WhoseTurn
+				gameStatus.GameID = filterGame.ID.Hex()
+
+				gameStatus.Code = "Game created"
+
+				return gameStatus, nil
+			}else{
+				// error finding user 2
+				gameStatus.Code = "User 2 not found, so game did not create"
+
+				return gameStatus, errors.New("User 2 not found, so game didnt create")
 			}
+		} else {
+			user2Filter := bson.M{"user": bson.M{"$eq": filterGame.User2}}
+			errU := colUsers.FindOne(context.TODO(), user2Filter).Decode(&filterUser2)
+			errU = colUsers.FindOne(context.TODO(), user1Filter).Decode(&filterUser1)
+			if errU == nil {
+				// found user 2
+				gameStatus.OpponentName = filterGame.User2
+				gameStatus.OpponentMonster = filterUser2.Monster
+				gameStatus.OpponentHealth = int32(filterGame.Health2)
+				gameStatus.MyHealth = int32(filterGame.Health1)
+				gameStatus.MyMonster = filterUser1.Monster
+				gameStatus.WhoseTurn = filterGame.WhoseTurn
+				gameStatus.GameID = filterGame.ID.Hex()
 
-			gameStatus.WhoseTurn = pokmonDB.games[value.gameUuid].users[0].userName
-			gameStatus.Uuid = value.gameUuid
+				gameStatus.Code = "Game created"
 
+				return gameStatus, nil
+			}else{
+				// error finding user 2
+				gameStatus.Code = "User 2 not found, so game did not create"
+
+				return gameStatus, errors.New("User 2 not found, so game didnt create")
+			}
+		}
+	} else if errG := colGames.FindOne(context.TODO(), gameFilter2).Decode(&filterGame); errG == nil {
+		// user is in a game, find user information
+		if name != filterGame.User1 {
+			user2Filter := bson.M{"user": bson.M{"$eq": filterGame.User1}}
+			errU := colUsers.FindOne(context.TODO(), user2Filter).Decode(&filterUser2)
+			errU = colUsers.FindOne(context.TODO(), user1Filter).Decode(&filterUser1)
+			if errU == nil {
+				// found user 2
+				gameStatus.OpponentName = filterGame.User1
+				gameStatus.OpponentMonster = filterUser2.Monster
+				gameStatus.OpponentHealth = int32(filterGame.Health1)
+				gameStatus.MyHealth = int32(filterGame.Health2)
+				gameStatus.MyMonster = filterUser1.Monster
+				gameStatus.WhoseTurn = filterGame.WhoseTurn
+				gameStatus.GameID = filterGame.ID.Hex()
+
+				gameStatus.Code = "Game created"
+
+				return gameStatus, nil
+			}else{
+				// error finding user 2
+				gameStatus.Code = "User 2 not found, so game did not create"
+
+				return gameStatus, errors.New("User 2 not found, so game didnt create")
+			}
+		} else {
+			user2Filter := bson.M{"user": bson.M{"$eq": filterGame.User2}}
+			errU := colUsers.FindOne(context.TODO(), user2Filter).Decode(&filterUser2)
+			errU = colUsers.FindOne(context.TODO(), user1Filter).Decode(&filterUser1)
+			if errU == nil {
+				// found user 2
+				gameStatus.OpponentName = filterGame.User2
+				gameStatus.OpponentMonster = filterUser2.Monster
+				gameStatus.OpponentHealth = int32(filterGame.Health2)
+				gameStatus.MyHealth = int32(filterGame.Health1)
+				gameStatus.MyMonster = filterUser1.Monster
+				gameStatus.WhoseTurn = filterGame.WhoseTurn
+				gameStatus.GameID = filterGame.ID.Hex()
+
+				gameStatus.Code = "Game created"
+
+				return gameStatus, nil
+			}else{
+				// error finding user 2
+				gameStatus.Code = "User 2 not found, so game did not create"
+
+				return gameStatus, errors.New("User 2 not found, so game didnt create")
+			}
+		}
+	} else {
+		// user was not found in any game, so we need to create a new game
+
+		for queue.length < 2 {
+			// wait for the queue lengh to increase to atleast 2 before creating the game
+		}		
+	
+		if queue.length >= 2 {
+			if name != queue.userNames[0] {
+				user2Filter := bson.M{"user": bson.M{"$eq": queue.userNames[0]}}
+				if errU := colUsers.FindOne(context.TODO(), user1Filter).Decode(&filterUser1); errU == nil {
+					if errU := colUsers.FindOne(context.TODO(), user2Filter).Decode(&filterUser2); errU == nil {
+						// Insert one game
+						res, _ := colGames.InsertOne(context.TODO(), &gameDatabase{
+							ID:            primitive.NewObjectID(),
+							User1:         filterUser1.User, 
+							User2:  	   filterUser2.User,
+						    Health1:       filterUser1.Health, 
+							Health2:       filterUser2.Health,
+							WhoseTurn:     filterUser2.User,
+							CreatedAt:     time.Now(),
+						})
+
+						gameStatus.OpponentName = filterUser2.User
+						gameStatus.OpponentMonster = filterUser2.Monster
+						gameStatus.OpponentHealth = int32(filterUser2.Health)
+						gameStatus.MyHealth = int32(filterUser1.Health)
+						gameStatus.MyMonster = filterUser1.Monster
+						gameStatus.WhoseTurn = filterUser2.User
+						gameStatus.GameID = res.InsertedID.(primitive.ObjectID).Hex()
+					}
+				}
+			} else {
+				user2Filter := bson.M{"user": bson.M{"$eq": queue.userNames[1]}}
+				if errU := colUsers.FindOne(context.TODO(), user1Filter).Decode(&filterUser1); errU == nil {
+					if errU := colUsers.FindOne(context.TODO(), user2Filter).Decode(&filterUser2); errU == nil {
+						// Insert one game
+						res, _ := colGames.InsertOne(context.TODO(), &gameDatabase{
+							ID:            primitive.NewObjectID(),
+							User1:         filterUser1.User, 
+							User2:  	   filterUser2.User,
+						    Health1:       filterUser1.Health, 
+							Health2:       filterUser2.Health,
+							WhoseTurn:     filterUser1.User,
+							CreatedAt:     time.Now(),
+						})
+
+						gameStatus.OpponentName = filterUser2.User
+						gameStatus.OpponentMonster = filterUser2.Monster
+						gameStatus.OpponentHealth = int32(filterUser2.Health)
+						gameStatus.MyHealth = int32(filterUser1.Health)
+						gameStatus.MyMonster = filterUser1.Monster
+						gameStatus.WhoseTurn = filterUser1.User
+						gameStatus.GameID = res.InsertedID.(primitive.ObjectID).Hex()
+					}
+				}
+			}
+	
+			// remove the first user from the queue
+			if queue.length > 1 {
+				queue.userNames = queue.userNames[1:queue.length]
+				queue.length = queue.length - 1
+			}
+			// remove the next person from the queue, check to see if there is more than one perosn left 
+			if queue.length > 1 {
+				queue.userNames = queue.userNames[1:queue.length]
+				queue.length = queue.length - 1
+			} else {
+				queue.userNames = make([]string, 0)
+				queue.length = 0
+			}
+	
+			gameStatus.Code = "Game created"
+	
 			return gameStatus, nil
+		} else { 
+			gameStatus.Code = "Error creating the game. Too few players"
+	
+			return gameStatus, errors.New("Error creating the game. Too few players")
 		}
 	}
-
-	for queue.length < 2 {
-		// wait for the queue lengh to increase to atleast 2
-	}		
-
-	if queue.length >= 2 {
-		gameStatus.Code = "Game created"
-
-		// this is game identifier
-		uuidWithHyphen := uuid.New()
-   		gameUUID := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
-
-		tempGame := gameID{}
-
-		tempGame.users[0] = userID{userName: queue.userNames[0], monster: pokmonDB.users[queue.userNames[0]]}
-		tempGame.users[1] = userID{userName: queue.userNames[1], monster: pokmonDB.users[queue.userNames[1]]}
-		tempGame.currentMonsterHealth[0] = tempGame.users[0].monster.attributes.healthPoint
-		tempGame.currentMonsterHealth[1] = tempGame.users[1].monster.attributes.healthPoint
-		tempGame.whoseTurn = queue.userNames[0]
-		tempGame.gameUuid = gameUUID
-
-		pokmonDB.games[gameUUID] = tempGame
-
-		if name != queue.userNames[0] {
-			gameStatus.OpponentName = queue.userNames[0]
-			gameStatus.OpponentMonster = pokmonDB.users[queue.userNames[0]].monsterName
-			gameStatus.OpponentHealth = tempGame.currentMonsterHealth[0]
-			gameStatus.MyHealth = tempGame.currentMonsterHealth[1]
-		} else {
-			gameStatus.OpponentName = queue.userNames[1]
-			gameStatus.OpponentMonster = pokmonDB.users[queue.userNames[1]].monsterName
-			gameStatus.OpponentHealth = tempGame.currentMonsterHealth[1]
-			gameStatus.MyHealth = tempGame.currentMonsterHealth[0]
-		}
-
-		gameStatus.WhoseTurn = queue.userNames[0]
-		gameStatus.Uuid = gameUUID
-
-		// remove the first user from the queue
-		if queue.length > 1 {
-			queue.userNames = queue.userNames[1:queue.length]
-			queue.length = queue.length - 1
-		}
-		// remove the next person from the queue, check to see if there is more than one perosn left 
-		if queue.length > 1 {
-			queue.userNames = queue.userNames[1:queue.length]
-			queue.length = queue.length - 1
-		} else {
-			queue.userNames = make([]string, 0)
-			queue.length = 0
-		}
-
-		return gameStatus, nil
-	} else { 
-		gameStatus.Code = "Error creating the game. Too few players"
-		return gameStatus, errors.New("Error creating the game. Too few players")
-	}
-
 }
 
 func (s *server) GetHealthPoints(ctx context.Context, in *pokmonapi.HealthRequest) (*pokmonapi.HealthPoints, error) {
 	name := in.GetName()
-	game := in.GetUuid()
+	gameID := in.GetGameID()
 	healthPoints := &pokmonapi.HealthPoints{}
 
-	if value, ok := pokmonDB.games[game]; ok {
-		for pokmonDB.games[game].whoseTurn != name{
+	objectID, _ := primitive.ObjectIDFromHex(gameID)
+
+	// select collection from database
+	colGames := client.Database("Pokmon").Collection("games")
+
+	// filters for the databases
+	gameFilter := bson.M{"_id": bson.M{"$eq": objectID}}
+
+	// find one user and one monster
+	var filterGame  gameDatabase
+	var tempHealth int
+
+	errG := colGames.FindOne(context.TODO(), gameFilter).Decode(&filterGame)
+	if errG == nil {
+		// found game with user in it
+		if name != filterGame.User1 {
+			tempHealth = filterGame.Health2
+		} else {
+			tempHealth = filterGame.Health1
+		}
+
+		var check bool = true
+		for check == true{
 			// wait for the opponent to make its move
 			time.Sleep(2 * time.Second)
+			colGames.FindOne(context.TODO(), gameFilter).Decode(&filterGame)
+			if filterGame.WhoseTurn == name {
+				break
+			}
 		}
-
-		if name != value.users[0].userName {
-			healthPoints.Health = value.currentMonsterHealth[1]
+		colGames.FindOne(context.TODO(), gameFilter).Decode(&filterGame)
+		if name != filterGame.User1 {
+			healthPoints.Health = int32(filterGame.Health2)
+			tempHealth = tempHealth - filterGame.Health2
 		} else {
-			healthPoints.Health = value.currentMonsterHealth[0]
+			healthPoints.Health = int32(filterGame.Health1)
+			tempHealth = tempHealth - filterGame.Health1
 		}
-
-		healthPoints.WhoseTurn = value.whoseTurn
+		
+		healthPoints.WhoseTurn = filterGame.WhoseTurn
+		healthPoints.LastAttack = filterGame.LastAttack
+		healthPoints.Damage = int32(tempHealth)
 
 		// delete the game if someone has hit zero HP
-		if value.currentMonsterHealth[1] == int32(0) || value.currentMonsterHealth[0] == int32(0) {
-			delete(pokmonDB.games, game)
+		if filterGame.Health2 == 0 || filterGame.Health1 == 0 {
+			//Perform DeleteOne operation & validate against the error.
+			_, err := colGames.DeleteOne(context.TODO(), gameFilter)
+			if err == nil {
+				// successfully deleted the game from database
+			} else {
+				// error happened while deleting the game from the database
+			}
 		}
 
 		return healthPoints, nil
 	} else {
+		// could not find the game with user in it
 		return healthPoints, errors.New("Error getting Health and whose turn")
 	}
 }
@@ -270,60 +522,146 @@ func (s *server) GetHealthPoints(ctx context.Context, in *pokmonapi.HealthReques
 func (s *server) MonsterAttack(ctx context.Context, in *pokmonapi.MonsterAction) (*pokmonapi.HealthPoints, error) {
 	name := in.GetName()
 	action := in.GetAction()
-	game := in.GetUuid()
+	gameID := in.GetGameID()
 	healthPoints := &pokmonapi.HealthPoints{}
+
+	objectID, _ := primitive.ObjectIDFromHex(gameID)
+
+	// select collection from database
+	colUsers := client.Database("Pokmon").Collection("users")
+	colGames := client.Database("Pokmon").Collection("games")
+
+	// filters for the databases
+	user1Filter := bson.M{"user": bson.M{"$eq": name}}
+	gameFilter := bson.M{"_id": bson.M{"$eq": objectID}}
+
+	// find one user and one monster
+	var filterUser1 userDatabase
+	var filterUser2 userDatabase
+	var filterGame  gameDatabase
 
 	rand.Seed(time.Now().UnixNano())
 
-	if value, ok := pokmonDB.games[game]; ok {
-		var randMax int
-		if name != value.users[0].userName {
-			randMax = elementDamage(value.users[1].monster.attributes.elementType, value.users[0].monster.attributes.elementType, action)
-		} else {
-			randMax = elementDamage(value.users[0].monster.attributes.elementType, value.users[1].monster.attributes.elementType, action)
-		}
+	errG := colGames.FindOne(context.TODO(), gameFilter).Decode(&filterGame)
+	if errG == nil {
+		if name != filterGame.User1 {
+			user2Filter := bson.M{"user": bson.M{"$eq": filterGame.User1}}
+			if errU := colUsers.FindOne(context.TODO(), user1Filter).Decode(&filterUser1); errU == nil {
+				if errU := colUsers.FindOne(context.TODO(), user2Filter).Decode(&filterUser2); errU == nil {
+					var randMax int
+					
+					randMax = elementDamage(filterUser1.Element, filterUser2.Element, action)
 
-		healthLoss := int32(rand.Intn(randMax))
-		healthLoss = int32(rand.Intn(randMax))
-		healthLoss = int32(rand.Intn(randMax))
+					healthLoss := rand.Intn(randMax)
+					healthLoss = rand.Intn(randMax)
+					healthLoss = rand.Intn(randMax)
 
-		if name != value.users[0].userName {
-			var tempHealth int32 = value.currentMonsterHealth[0] - healthLoss
-			if tempHealth < 0 {
-				value.currentMonsterHealth[0] = 0
-			} else { 
-				value.currentMonsterHealth[0] = tempHealth
+					var tempHealth int = filterGame.Health1 - healthLoss
+
+					if tempHealth < 0 {
+						tempHealth = 0
+					} 
+
+					healthPoints.Health = int32(tempHealth)
+					// upadter for specified item and price
+					updater := bson.M{"$set": bson.M{"health1": tempHealth, "health2": filterGame.Health2, "whose_turn": filterGame.User1, "last_attack": action, "updated_at": time.Now()}}
+
+					//Perform UpdateOne operation & validate against the error.
+					_, err := colGames.UpdateOne(context.TODO(), gameFilter, updater)
+					colGames.FindOne(context.TODO(), gameFilter).Decode(&filterGame)
+
+					if err == nil {
+						healthPoints.WhoseTurn = filterGame.User1
+						healthPoints.Health = int32(filterGame.Health1)
+						healthPoints.LastAttack = action
+						healthPoints.Damage = int32(healthLoss)
+
+						return healthPoints, nil
+					} else {
+						// error updating the game
+					}
+				}
 			}
-			healthPoints.Health = value.currentMonsterHealth[0]
-			value.whoseTurn = value.users[0].userName
 		} else {
-			var tempHealth int32 = value.currentMonsterHealth[1] - healthLoss
-			if tempHealth < 0 {
-				value.currentMonsterHealth[1] = 0
-			} else { 
-				value.currentMonsterHealth[1] = tempHealth
+			user2Filter := bson.M{"user": bson.M{"$eq": filterGame.User2}}
+			if errU := colUsers.FindOne(context.TODO(), user1Filter).Decode(&filterUser1); errU == nil {
+				if errU := colUsers.FindOne(context.TODO(), user2Filter).Decode(&filterUser2); errU == nil {
+					var randMax int
+					
+					randMax = elementDamage(filterUser1.Element, filterUser2.Element, action)
+
+					healthLoss := rand.Intn(randMax)
+					healthLoss = rand.Intn(randMax)
+					healthLoss = rand.Intn(randMax)
+
+					var tempHealth int = filterGame.Health2 - healthLoss
+
+					if tempHealth < 0 {
+						tempHealth = 0
+					} 
+					
+					// upadter for specified item and price
+					updater := bson.M{"$set": bson.M{"health1": filterGame.Health1, "health2": tempHealth, "whose_turn": filterGame.User2, "last_attack": action, "updated_at": time.Now()}}
+
+					//Perform UpdateOne operation & validate against the error.
+					_, err := colGames.UpdateOne(context.TODO(), gameFilter, updater)
+					colGames.FindOne(context.TODO(), gameFilter).Decode(&filterGame)
+
+					if err == nil {
+						healthPoints.WhoseTurn = filterGame.User2
+						healthPoints.Health = int32( filterGame.Health2)
+						healthPoints.LastAttack = action
+						healthPoints.Damage = int32(healthLoss)
+
+						return healthPoints, nil
+					} else {
+						// error updating the game
+					}
+				}
 			}
-			healthPoints.Health = value.currentMonsterHealth[1]
-			value.whoseTurn = value.users[1].userName
 		}
-
-		healthPoints.WhoseTurn = value.whoseTurn
-
-		pokmonDB.games[game] = value
-
-		return healthPoints, nil
 	} else {
 		return healthPoints, errors.New("Error getting Health and whose turn")
 	}
+
+	return healthPoints, errors.New("Error getting Health and whose turn")
 }
 
 func (s *server) GetActionInfo(ctx context.Context, in *pokmonapi.RequestInfo ) (*pokmonapi.AttackActions, error) {
 	name := in.GetName()
 	actions := &pokmonapi.AttackActions{}
 
-	actions.Actions = pokmonDB.monsters[pokmonDB.users[name].monsterName].attackMoves
+	// select collection from database
+	colUsers := client.Database("Pokmon").Collection("users")
+	colMonsters := client.Database("Pokmon").Collection("monsters")
 
-	return actions, nil
+	// filters for the databases
+	userFilter := bson.M{"user": bson.M{"$eq": name}}
+
+	// find one user and one monster
+	var filterUser userDatabase
+	var filterMonster monsterDatabase
+
+	if errM := colUsers.FindOne(context.TODO(), userFilter).Decode(&filterUser); errM == nil {
+		monsterFilter := bson.M{"monster": bson.M{"$eq": filterUser.Monster}}
+		if errU := colMonsters.FindOne(context.TODO(), monsterFilter).Decode(&filterMonster); errU == nil {
+			// found monster in database
+			var tempActionSlice []string
+			for _, actions := range filterMonster.AttackMoves {
+				tempActionSlice = append(tempActionSlice, actions)
+			}
+			actions.Actions = tempActionSlice
+			actions.Actions = filterMonster.AttackMoves
+			return actions, nil
+		} else {
+			// could not find the monster in the database\
+			return actions, errors.New("Error getting actions of monster")
+		}
+	} else {
+		// could not find the user in the database
+		return actions, errors.New("Error getting actions of monster")
+	}
+
 }
 
 func (s *server) GetOpponentInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*pokmonapi.OpponentStatus, error) {
@@ -370,32 +708,23 @@ func elementDamage(myType string, oppType string, action string) int{
 }
 
 func main() {
-	// initialize the database maps
-	pokmonDB.users = make(map[string]monsterID)
-	pokmonDB.monsters = make(map[string]monsterStats)
-	pokmonDB.games =make(map[string]gameID)
-	attackPowerDB = make(map[string]int32)
+	fmt.Println("Starting Server")
 
-	// initialize the monster database
-	var tempStats monsterStats
-	for i := 0; i < 12; i++ {
-		if (i % 3) == 0 { // grass monsters
-			tempStats.attackMoves = monsterAttackDB[0]
-			tempStats.healthPoint = monsterHealthDB[i]
-			tempStats.elementType = monsterElementDB[0]
-		} else if (i % 3) == 1 { // fire monsters
-			tempStats.attackMoves = monsterAttackDB[1]
-			tempStats.healthPoint = monsterHealthDB[i]
-			tempStats.elementType = monsterElementDB[1]
-		} else if (i % 3) == 2 { // water monsters
-			tempStats.attackMoves = monsterAttackDB[2]
-			tempStats.healthPoint = monsterHealthDB[i]
-			tempStats.elementType = monsterElementDB[2]
-		}
+	// create a mongo client
+	clientInstance, err := mongo.NewClient(
+		options.Client().ApplyURI(mongodbEndpoint),
+	)
 
-		pokmonDB.monsters[monsterNamesDB[i]] = tempStats
-	}
+	// Connect to mongo
+	err = clientInstance.Connect(context.TODO())
 
+	// Disconnect
+	defer clientInstance.Disconnect(context.TODO())
+
+	client = clientInstance
+
+	// creates map for attack moves and their power level
+	attackPowerDB = make(map[string]int)
 	var counter int = 0
 	for i := 0; i < 3; i++ {
 		for j := 0; j < 4; j++ {
@@ -412,6 +741,8 @@ func main() {
 
 	s := grpc.NewServer()
 	pokmonapi.RegisterPokmonInfoServer(s, &server{})
+
+	fmt.Println("Server successfully started")
 
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)

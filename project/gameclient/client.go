@@ -17,16 +17,19 @@ import (
 )
 
 const (
-	address = "localhost:50051"
+	//address = "localhost:50051"      //local
+	address = "10.152.183.178:50051" //kubernetes
 )
 
 type gameID struct {
 	users                [2]string
 	monsters			 [2]string
-	totalMonsterHealth   [2]int32
-	currentMonsterHealth [2]int32
+	totalMonsterHealth   [2]int
+	currentMonsterHealth [2]int
 	whoseTurn            string
-	gameID             string
+	gameId               string
+	lastAttack           string
+	damage               int
 }
 
 func main() {
@@ -123,23 +126,22 @@ func main() {
 
 				// set monsters of the game
 				game.monsters[0] = gameStatus.GetOpponentMonster()
-				game.monsters[1] = monster
+				game.monsters[1] = gameStatus.GetMyMonster()
 
 				// set monsters health
-				game.currentMonsterHealth[0] = gameStatus.GetOpponentHealth()
-				game.currentMonsterHealth[1] = gameStatus.GetMyHealth()
-				game.totalMonsterHealth[0] = gameStatus.GetOpponentHealth()
-				game.totalMonsterHealth[1] = gameStatus.GetMyHealth()
+				game.currentMonsterHealth[0] = int(gameStatus.GetOpponentHealth())
+				game.currentMonsterHealth[1] = int(gameStatus.GetMyHealth())
+				game.totalMonsterHealth[0] = int(gameStatus.GetOpponentHealth())
+				game.totalMonsterHealth[1] = int(gameStatus.GetMyHealth())
 
 				// set whose turn
 				game.whoseTurn = gameStatus.GetWhoseTurn()
 
-				// set playerID
-				game.gameID = gameStatus.GetUuid()
+				// set game ID
+				game.gameId = gameStatus.GetGameID()
 
-
-				// set display to start 
-				displayType = "battle"
+				// set display to setup 
+				displayType = "setup"
 
 				err = displayGame(displayType, game)
 				if err != nil {
@@ -180,14 +182,16 @@ func main() {
 						}
 
 						// send action returns opponents Health Points and turn change
-						gameInfo, err := c.MonsterAttack(context.TODO(), &pokmonapi.MonsterAction{Name: userName, Action: action, Uuid: game.gameID})
+						gameInfo, err := c.MonsterAttack(context.TODO(), &pokmonapi.MonsterAction{Name: userName, Action: action, GameID: game.gameId})
 
 						if err == nil{
-							game.currentMonsterHealth[0] = gameInfo.GetHealth()
+							game.currentMonsterHealth[0] = int(gameInfo.GetHealth())
 							game.whoseTurn = gameInfo.GetWhoseTurn()
+							game.lastAttack = gameInfo.GetLastAttack()
+							game.damage = int(gameInfo.GetDamage())
 						}
 
-						err = displayGame(displayType, game)
+						err = displayGame("battle-attacker", game)
 						if err != nil {
 							log.Fatalf("did not display game: %v", err)
 						}
@@ -200,14 +204,16 @@ func main() {
 						fmt.Println("Waiting for opponent to attack")
 					
 						// check my Health Points returns my Health Points and turn change
-						gameInfo, err := c.GetHealthPoints(context.TODO(), &pokmonapi.HealthRequest{Name: userName, Uuid: game.gameID})
+						gameInfo, err := c.GetHealthPoints(context.TODO(), &pokmonapi.HealthRequest{Name: userName, GameID: game.gameId})
 
 						if err == nil{
-							game.currentMonsterHealth[1] = gameInfo.GetHealth()
+							game.currentMonsterHealth[1] = int(gameInfo.GetHealth())
 							game.whoseTurn = gameInfo.GetWhoseTurn()
+							game.lastAttack = gameInfo.GetLastAttack()
+							game.damage = int(gameInfo.GetDamage())
 						}
 
-						err = displayGame(displayType, game)
+						err = displayGame("battle-defender", game)
 						if err != nil {
 							log.Fatalf("did not display game: %v", err)
 						}
@@ -243,7 +249,7 @@ func main() {
 
 func displayGame(display string, game gameID) error {
 	switch display{
-	case "battle":
+	case "setup":
 		// clear the terminal
 		cmd := exec.Command("clear") //Linux example, its tested
         cmd.Stdout = os.Stdout
@@ -259,14 +265,58 @@ func displayGame(display string, game gameID) error {
 		// display self information
 		fmt.Printf("Your Name: %s\n", game.users[1])
 		fmt.Printf("Your Monster: %s\n", game.monsters[1])
-		fmt.Printf("Monster's Health: %d / %d\n", game.currentMonsterHealth[1], game.totalMonsterHealth[1])
+		fmt.Printf("Monster's Health: %d / %d\n\n", game.currentMonsterHealth[1], game.totalMonsterHealth[1])
 
 		fmt.Println("----------------------------------------------------\n\n")
 
 		return nil
-	case "prepare":
+	case "battle-attacker":
 		// something
-		// clear the screen so it is easier to read the text being presented to the user
+		// clear the terminal
+		cmd := exec.Command("clear") //Linux example, its tested
+        cmd.Stdout = os.Stdout
+		cmd.Run()
+		
+		// display opponent information
+		fmt.Printf("Opponent's Name: %s\n", game.users[0])
+		fmt.Printf("Opponent's Monster: %s\n", game.monsters[0])
+		fmt.Printf("Monster's Health: %d / %d\n", game.currentMonsterHealth[0], game.totalMonsterHealth[0])
+
+		fmt.Printf("\n\n\n\n")
+
+		// display self information
+		fmt.Printf("Your Name: %s\n", game.users[1])
+		fmt.Printf("Your Monster: %s\n", game.monsters[1])
+		fmt.Printf("Monster's Health: %d / %d\n\n", game.currentMonsterHealth[1], game.totalMonsterHealth[1])
+
+		fmt.Printf("------------------------------------------------------------\n")
+		fmt.Printf("%s's %s used %s and did %d damage            \n", game.users[1], game.monsters[1], game.lastAttack, game.damage)
+		fmt.Printf("------------------------------------------------------------\n\n")
+
+		return nil	
+	case "battle-defender":
+		// something
+		// clear the terminal
+		cmd := exec.Command("clear") //Linux example, its tested
+        cmd.Stdout = os.Stdout
+		cmd.Run()
+		
+		// display opponent information
+		fmt.Printf("Opponent's Name: %s\n", game.users[0])
+		fmt.Printf("Opponent's Monster: %s\n", game.monsters[0])
+		fmt.Printf("Monster's Health: %d / %d\n", game.currentMonsterHealth[0], game.totalMonsterHealth[0])
+
+		fmt.Printf("\n\n\n\n")
+
+		// display self information
+		fmt.Printf("Your Name: %s\n", game.users[1])
+		fmt.Printf("Your Monster: %s\n", game.monsters[1])
+		fmt.Printf("Monster's Health: %d / %d\n\n", game.currentMonsterHealth[1], game.totalMonsterHealth[1])
+
+		fmt.Printf("------------------------------------------------------------\n")
+		fmt.Printf("%s's %s used %s and did %d damage            \n", game.users[0], game.monsters[0], game.lastAttack, game.damage)
+		fmt.Printf("------------------------------------------------------------\n\n")
+
 		return nil	
 	}
 
