@@ -1,0 +1,15 @@
+FROM golang:1.14-alpine AS build
+
+WORKDIR /src/
+
+COPY go.mod /src/
+COPY go.sum /src/
+RUN go mod download
+
+COPY gameapi /src/gameapi
+COPY gameserver/game.go /src/
+RUN CGO_ENABLED=0 go build -o /bin/game
+
+FROM scratch
+COPY --from=build /bin/game /bin/game
+ENTRYPOINT ["/bin/game"]

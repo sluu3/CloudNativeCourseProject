@@ -8,16 +8,13 @@ package pokmonapi;
 service PokmonInfo {
 	rpc GetMonsterInfo (MonsterName) returns (MonsterNames) {}        // user retrieving monsters from database
 	rpc SetMonsterInfo (UserAndName) returns (Status) {}              // user setting up team by adding monsters
-    rpc MonsterAttack (MonsterAction) returns (HealthPoints) {}     // user deciding monster's attack action
 	rpc JoinQueue (UserName) returns (Status) {}                      // user says their ready to play
 	//rpc LeaveQueue (UserName) returns (Status) {}                     // user wants to leave the queue because they scared 
 	rpc LeaveGame (UserName) returns (Status) {}                      // user wants to leave game *(might not need this)*
 	rpc SetUserName (UserName) returns (Status) {}                    // user set/sends name to server
 	//rpc SetCredentials (Credentials) returns (Status) {}              // user sets Credentials to server *(this is extra)* //uncomment credentials lne 47
-	rpc GetHealthPoints (HealthRequest) returns (HealthPoints) {}     // user requests the health points of their monster
 	rpc GetGameInfo (RequestInfo) returns (GameStatus) {}             // user requests opponent's name, monster, hp
- 	rpc GetOpponentInfo (RequestInfo) returns (OpponentStatus) {}     // user requests opponent's hp, attack action
-	rpc GetActionInfo (RequestInfo) returns (AttackActions) {}       // user requests attack actions
+	rpc GetActionInfo (RequestInfo) returns (AttackActions) {}        // user needs this to know attack options for monster
 }
 
 // The request message containing ONE monster name
@@ -35,13 +32,6 @@ message UserAndName {
 	string name = 1;
 	string monster = 2;
 }
- 
-// The request message containing monster action
-message MonsterAction {
-	string name = 1;
-    string action = 2;
-	string gameID = 3;
-}
 
 // The message for setting UserName
 message UserName {
@@ -54,18 +44,6 @@ message UserName {
 	string password = 2;
 }*/
 
-message HealthRequest {
-	string name = 1;
-	string gameID = 2;
-}
-
-message HealthPoints {
-	int32 health = 1;
-	string whoseTurn = 2;
-	string lastAttack = 3;
-	int32 damage = 4;
-}
-
 message GameStatus {
 	string opponentName = 1;
 	string opponentMonster = 2;
@@ -73,14 +51,9 @@ message GameStatus {
 	string whoseTurn = 4;
 	int32 myHealth = 5;
 	string myMonster = 6;
-	string code = 7;
+	string code = 7;         // Game Status
 	string gameID = 8;	
-}
-
-message OpponentStatus {
-	string name = 1;
-	int32  health = 2;
-	string action = 3;
+	int32 gamePort = 9;
 }
 
 message RequestInfo {

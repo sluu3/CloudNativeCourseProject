@@ -1,0 +1,46 @@
+// Proto file for movie info service. Note this is gRPC proto syntax (not Go)
+syntax = "proto3";
+
+option go_package = "project/gameapi";
+
+package gameapi;
+
+service GameInfo {
+    rpc MonsterAttack (MonsterAction) returns (HealthPoints) {}     // user deciding monster's attack action
+	rpc GetHealthPoints (HealthRequest) returns (HealthPoints) {}     // user requests the health points of their monster
+	rpc GetGameInfo (RequestInfo) returns (GameStatus) {}             // user requests opponent's name, monster, hp
+}
+ 
+// The request message containing monster action
+message MonsterAction {
+	string name = 1;
+    string action = 2;
+	string gameID = 3;
+}
+
+message HealthRequest {
+	string name = 1;
+	string gameID = 2;
+}
+
+message HealthPoints {
+	int32 health = 1;
+	string whoseTurn = 2;
+	string lastAttack = 3;
+	int32 damage = 4;
+}
+
+message GameStatus {
+	string opponentName = 1;
+	string opponentMonster = 2;
+	int32  opponentHealth = 3;
+	string whoseTurn = 4;
+	int32 myHealth = 5;
+	string myMonster = 6;
+	string code = 7;
+	string gameID = 8;	
+}
+
+message RequestInfo {
+	string name = 1;
+}

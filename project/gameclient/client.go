@@ -10,15 +10,17 @@ import (
 	"os"
 	"os/exec"
 	"time"
+	"strconv"
 
 	"project/pokmonapi"
+	"project/gameapi"
 
 	"google.golang.org/grpc"
 )
 
 const (
-	//address = "localhost:50051"      //local
-	address = "10.152.183.178:50051" //kubernetes
+	address = "localhost:50051"      //local
+	//address = "10.152.183.178:50051" //kubernetes
 )
 
 type gameID struct {
@@ -28,6 +30,7 @@ type gameID struct {
 	currentMonsterHealth [2]int
 	whoseTurn            string
 	gameId               string
+	gamePort             int
 	lastAttack           string
 	damage               int
 }
@@ -47,8 +50,7 @@ func main() {
 		log.Fatalf("did not connect: %v", err)
 	}
 
-	defer conn.Close()
-	c := pokmonapi.NewPokmonInfoClient(conn)
+	server_grpc := pokmonapi.NewPokmonInfoClient(conn)
 
 	// Timeout if server doesn't respond
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
@@ -62,7 +64,7 @@ func main() {
 	input.Scan()
 	userName = input.Text()
 
-	status, err := c.SetUserName(ctx, &pokmonapi.UserName{Name: userName})
+	status, err := server_grpc.SetUserName(ctx, &pokmonapi.UserName{Name: userName})
 	fmt.Println(status)
 
 	if err == nil {
@@ -70,7 +72,7 @@ func main() {
 			// does nothing 
 		} else {
 			// printing the monsters the users can choose from
-			monsterNames, err := c.GetMonsterInfo(ctx, &pokmonapi.MonsterName{Monster: "none"})
+			monsterNames, err := server_grpc.GetMonsterInfo(ctx, &pokmonapi.MonsterName{Monster: "none"})
 
 			if err == nil {
 				fmt.Printf("\nMonsters to choose from: %v\n", monsterNames.GetMonsters())
@@ -91,7 +93,7 @@ func main() {
 				}
 
 				// set the user's monster to the userName
-				status, err = c.SetMonsterInfo(ctx, &pokmonapi.UserAndName{Name: userName, Monster: monster})
+				status, err = server_grpc.SetMonsterInfo(ctx, &pokmonapi.UserAndName{Name: userName, Monster: monster})
 				fmt.Println(status)	
 			}	
 		}
@@ -105,7 +107,7 @@ func main() {
 				//readyCheck, _ = reader.ReadString('\n')
 
 				if readyCheck == "Ready" || readyCheck == "ready" {
-					status, err = c.JoinQueue(ctx, &pokmonapi.UserName{Name: userName})
+					status, err = server_grpc.JoinQueue(ctx, &pokmonapi.UserName{Name: userName})
 					fmt.Println(status)
 					break
 				}
@@ -116,7 +118,7 @@ func main() {
 			// client game
 			for {
 				// create game after joining the queue
-				gameStatus, err := c.GetGameInfo(context.TODO(), &pokmonapi.RequestInfo{Name: userName})
+				gameStatus, err := server_grpc.GetGameInfo(context.TODO(), &pokmonapi.RequestInfo{Name: userName})
 
 				fmt.Println(gameStatus)
 
@@ -140,6 +142,10 @@ func main() {
 				// set game ID
 				game.gameId = gameStatus.GetGameID()
 
+				// set game port
+				game.gamePort = int(gameStatus.GetGamePort())
+				fmt.Println(game.gamePort, "\n")
+
 				// set display to setup 
 				displayType = "setup"
 
@@ -149,7 +155,17 @@ func main() {
 				}
 
 				// get the available actions for the user's monster
-				attackActions, err := c.GetActionInfo(context.TODO(), &pokmonapi.RequestInfo{Name: userName})
+				attackActions, err := server_grpc.GetActionInfo(context.TODO(), &pokmonapi.RequestInfo{Name: userName})
+
+				conn.Close()
+				newAddress := "localhost:" + strconv.Itoa(game.gamePort)
+				// Set up a connection to the game.
+				conn, err := grpc.Dial(newAddress, grpc.WithInsecure(), grpc.WithBlock())
+				if err != nil {
+					log.Fatalf("did not connect: %v", err)
+				}
+				game_grpc := gameapi.NewGameInfoClient(conn)
+
 
 				// pokmon battle happens here as long as no player has 0 or fewer HP
 				for { 
@@ -182,7 +198,7 @@ func main() {
 						}
 
 						// send action returns opponents Health Points and turn change
-						gameInfo, err := c.MonsterAttack(context.TODO(), &pokmonapi.MonsterAction{Name: userName, Action: action, GameID: game.gameId})
+						gameInfo, err := game_grpc.MonsterAttack(context.TODO(), &gameapi.MonsterAction{Name: userName, Action: action, GameID: game.gameId})
 
 						if err == nil{
 							game.currentMonsterHealth[0] = int(gameInfo.GetHealth())
@@ -204,7 +220,7 @@ func main() {
 						fmt.Println("Waiting for opponent to attack")
 					
 						// check my Health Points returns my Health Points and turn change
-						gameInfo, err := c.GetHealthPoints(context.TODO(), &pokmonapi.HealthRequest{Name: userName, GameID: game.gameId})
+						gameInfo, err := game_grpc.GetHealthPoints(context.TODO(), &gameapi.HealthRequest{Name: userName, GameID: game.gameId})
 
 						if err == nil{
 							game.currentMonsterHealth[1] = int(gameInfo.GetHealth())
@@ -227,15 +243,30 @@ func main() {
 
 				fmt.Println("\nWould you like to play again? \nEnter 'Ready' if you want to rejoin the queue: ")
 
+				conn.Close()
+
 				for {
 					input.Scan()
 					readyCheck = input.Text()
 					//readyCheck, _ = reader.ReadString('\n')
 
 					if readyCheck == "Ready" || readyCheck == "ready" {
-						status, err = c.JoinQueue(context.TODO(), &pokmonapi.UserName{Name: userName})
+						
+						// Set up a connection to the game.
+						conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+						if err != nil {
+							log.Fatalf("did not connect: %v", err)
+						}
+
+						server_grpc = pokmonapi.NewPokmonInfoClient(conn)
+
+						status, err = server_grpc.JoinQueue(context.TODO(), &pokmonapi.UserName{Name: userName})
 						fmt.Println(status)
-						break
+						if err == nil {
+							break
+						} else {
+							fmt.Println("something went really wrong, you should be scared")
+						}
 					} else if readyCheck == "Quit" || readyCheck == "quit" {
 						return
 					}

@@ -20,15 +20,12 @@ const _ = grpc.SupportPackageIsVersion7
 type PokmonInfoClient interface {
 	GetMonsterInfo(ctx context.Context, in *MonsterName, opts ...grpc.CallOption) (*MonsterNames, error)
 	SetMonsterInfo(ctx context.Context, in *UserAndName, opts ...grpc.CallOption) (*Status, error)
-	MonsterAttack(ctx context.Context, in *MonsterAction, opts ...grpc.CallOption) (*HealthPoints, error)
 	JoinQueue(ctx context.Context, in *UserName, opts ...grpc.CallOption) (*Status, error)
 	//rpc LeaveQueue (UserName) returns (Status) {}                     // user wants to leave the queue because they scared
 	LeaveGame(ctx context.Context, in *UserName, opts ...grpc.CallOption) (*Status, error)
 	SetUserName(ctx context.Context, in *UserName, opts ...grpc.CallOption) (*Status, error)
 	//rpc SetCredentials (Credentials) returns (Status) {}              // user sets Credentials to server *(this is extra)* //uncomment credentials lne 47
-	GetHealthPoints(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthPoints, error)
 	GetGameInfo(ctx context.Context, in *RequestInfo, opts ...grpc.CallOption) (*GameStatus, error)
-	GetOpponentInfo(ctx context.Context, in *RequestInfo, opts ...grpc.CallOption) (*OpponentStatus, error)
 	GetActionInfo(ctx context.Context, in *RequestInfo, opts ...grpc.CallOption) (*AttackActions, error)
 }
 
@@ -52,15 +49,6 @@ func (c *pokmonInfoClient) GetMonsterInfo(ctx context.Context, in *MonsterName, 
 func (c *pokmonInfoClient) SetMonsterInfo(ctx context.Context, in *UserAndName, opts ...grpc.CallOption) (*Status, error) {
 	out := new(Status)
 	err := c.cc.Invoke(ctx, "/pokmonapi.PokmonInfo/SetMonsterInfo", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *pokmonInfoClient) MonsterAttack(ctx context.Context, in *MonsterAction, opts ...grpc.CallOption) (*HealthPoints, error) {
-	out := new(HealthPoints)
-	err := c.cc.Invoke(ctx, "/pokmonapi.PokmonInfo/MonsterAttack", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -94,27 +82,9 @@ func (c *pokmonInfoClient) SetUserName(ctx context.Context, in *UserName, opts .
 	return out, nil
 }
 
-func (c *pokmonInfoClient) GetHealthPoints(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthPoints, error) {
-	out := new(HealthPoints)
-	err := c.cc.Invoke(ctx, "/pokmonapi.PokmonInfo/GetHealthPoints", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *pokmonInfoClient) GetGameInfo(ctx context.Context, in *RequestInfo, opts ...grpc.CallOption) (*GameStatus, error) {
 	out := new(GameStatus)
 	err := c.cc.Invoke(ctx, "/pokmonapi.PokmonInfo/GetGameInfo", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *pokmonInfoClient) GetOpponentInfo(ctx context.Context, in *RequestInfo, opts ...grpc.CallOption) (*OpponentStatus, error) {
-	out := new(OpponentStatus)
-	err := c.cc.Invoke(ctx, "/pokmonapi.PokmonInfo/GetOpponentInfo", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -136,15 +106,12 @@ func (c *pokmonInfoClient) GetActionInfo(ctx context.Context, in *RequestInfo, o
 type PokmonInfoServer interface {
 	GetMonsterInfo(context.Context, *MonsterName) (*MonsterNames, error)
 	SetMonsterInfo(context.Context, *UserAndName) (*Status, error)
-	MonsterAttack(context.Context, *MonsterAction) (*HealthPoints, error)
 	JoinQueue(context.Context, *UserName) (*Status, error)
 	//rpc LeaveQueue (UserName) returns (Status) {}                     // user wants to leave the queue because they scared
 	LeaveGame(context.Context, *UserName) (*Status, error)
 	SetUserName(context.Context, *UserName) (*Status, error)
 	//rpc SetCredentials (Credentials) returns (Status) {}              // user sets Credentials to server *(this is extra)* //uncomment credentials lne 47
-	GetHealthPoints(context.Context, *HealthRequest) (*HealthPoints, error)
 	GetGameInfo(context.Context, *RequestInfo) (*GameStatus, error)
-	GetOpponentInfo(context.Context, *RequestInfo) (*OpponentStatus, error)
 	GetActionInfo(context.Context, *RequestInfo) (*AttackActions, error)
 	mustEmbedUnimplementedPokmonInfoServer()
 }
@@ -159,9 +126,6 @@ func (UnimplementedPokmonInfoServer) GetMonsterInfo(context.Context, *MonsterNam
 func (UnimplementedPokmonInfoServer) SetMonsterInfo(context.Context, *UserAndName) (*Status, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetMonsterInfo not implemented")
 }
-func (UnimplementedPokmonInfoServer) MonsterAttack(context.Context, *MonsterAction) (*HealthPoints, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method MonsterAttack not implemented")
-}
 func (UnimplementedPokmonInfoServer) JoinQueue(context.Context, *UserName) (*Status, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method JoinQueue not implemented")
 }
@@ -171,14 +135,8 @@ func (UnimplementedPokmonInfoServer) LeaveGame(context.Context, *UserName) (*Sta
 func (UnimplementedPokmonInfoServer) SetUserName(context.Context, *UserName) (*Status, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetUserName not implemented")
 }
-func (UnimplementedPokmonInfoServer) GetHealthPoints(context.Context, *HealthRequest) (*HealthPoints, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetHealthPoints not implemented")
-}
 func (UnimplementedPokmonInfoServer) GetGameInfo(context.Context, *RequestInfo) (*GameStatus, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetGameInfo not implemented")
-}
-func (UnimplementedPokmonInfoServer) GetOpponentInfo(context.Context, *RequestInfo) (*OpponentStatus, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetOpponentInfo not implemented")
 }
 func (UnimplementedPokmonInfoServer) GetActionInfo(context.Context, *RequestInfo) (*AttackActions, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetActionInfo not implemented")
@@ -228,24 +186,6 @@ func _PokmonInfo_SetMonsterInfo_Handler(srv interface{}, ctx context.Context, de
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(PokmonInfoServer).SetMonsterInfo(ctx, req.(*UserAndName))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _PokmonInfo_MonsterAttack_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(MonsterAction)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(PokmonInfoServer).MonsterAttack(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/pokmonapi.PokmonInfo/MonsterAttack",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PokmonInfoServer).MonsterAttack(ctx, req.(*MonsterAction))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -304,24 +244,6 @@ func _PokmonInfo_SetUserName_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _PokmonInfo_GetHealthPoints_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(HealthRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(PokmonInfoServer).GetHealthPoints(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/pokmonapi.PokmonInfo/GetHealthPoints",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PokmonInfoServer).GetHealthPoints(ctx, req.(*HealthRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _PokmonInfo_GetGameInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RequestInfo)
 	if err := dec(in); err != nil {
@@ -336,24 +258,6 @@ func _PokmonInfo_GetGameInfo_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(PokmonInfoServer).GetGameInfo(ctx, req.(*RequestInfo))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _PokmonInfo_GetOpponentInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RequestInfo)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(PokmonInfoServer).GetOpponentInfo(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/pokmonapi.PokmonInfo/GetOpponentInfo",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PokmonInfoServer).GetOpponentInfo(ctx, req.(*RequestInfo))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -392,10 +296,6 @@ var PokmonInfo_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _PokmonInfo_SetMonsterInfo_Handler,
 		},
 		{
-			MethodName: "MonsterAttack",
-			Handler:    _PokmonInfo_MonsterAttack_Handler,
-		},
-		{
 			MethodName: "JoinQueue",
 			Handler:    _PokmonInfo_JoinQueue_Handler,
 		},
@@ -408,16 +308,8 @@ var PokmonInfo_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _PokmonInfo_SetUserName_Handler,
 		},
 		{
-			MethodName: "GetHealthPoints",
-			Handler:    _PokmonInfo_GetHealthPoints_Handler,
-		},
-		{
 			MethodName: "GetGameInfo",
 			Handler:    _PokmonInfo_GetGameInfo_Handler,
-		},
-		{
-			MethodName: "GetOpponentInfo",
-			Handler:    _PokmonInfo_GetOpponentInfo_Handler,
 		},
 		{
 			MethodName: "GetActionInfo",
