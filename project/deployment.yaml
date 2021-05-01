@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pokmon-server
+spec:
+  selector:
+    matchLabels:
+      name: pokmon-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: pokmon-server
+    spec:
+      containers:
+        - name: application
+          image: sluu3/pokmonserver:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 50051
+              protocol: TCP
+        - name: application2
+          image: sluu3/pokmongame:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              protocol: TCP
