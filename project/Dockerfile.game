@@ -7,7 +7,7 @@ COPY go.sum /src/
 RUN go mod download
 
 COPY gameapi /src/gameapi
-COPY gameserver/game.go /src/
+COPY project/gameserver/game.go /src/
 RUN CGO_ENABLED=0 go build -o /bin/game
 
 FROM scratch
