@@ -19,8 +19,8 @@ import (
 
 const (
 	//address = "localhost:50051"      //local
-	server_address = "192.168.0.174:31187" //kubernetes
-	game_address   = "192.168.0.174:31061" //kubernetes
+	server_address = "192.168.0.174:32225" //kubernetes
+	game_address   = "192.168.0.174:30810" //kubernetes
 )
 
 type gameID struct {

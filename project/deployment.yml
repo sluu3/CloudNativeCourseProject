@@ -19,6 +19,22 @@ spec:
           ports:
             - containerPort: 50051
               protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pokmon-game
+spec:
+  selector:
+    matchLabels:
+      name: pokmon-game
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        name: pokmon-game
+    spec:
+      containers:
         - name: application2
           image: sluu3/pokmongame:latest
           imagePullPolicy: Always
