@@ -270,7 +270,7 @@ func main() {
 						//time.Sleep(time.Second)
 
 						status, err = server_grpc.JoinQueue(context.TODO(), &pokmonapi.UserName{Name: userName})
-						fmt.Println(status, "\t", err)
+						fmt.Println(status)
 
 						if err == nil {
 							break
