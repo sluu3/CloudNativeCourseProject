@@ -7,7 +7,7 @@ COPY go.sum /src/
 RUN go mod download
 
 COPY pokmonapi /src/pokmonapi
-COPY gameserver/server.go /src/
+COPY project/gameserver/server.go /src/
 RUN CGO_ENABLED=0 go build -o /bin/server
 
 FROM scratch
