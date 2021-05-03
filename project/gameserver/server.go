@@ -69,7 +69,7 @@ type server struct {
 var monsterAttackDB [][]string = [][]string{{"Leaf blade", "Energy ball", "Apple acid", "Tackle"}, {"Flamethrower", "Blaze kick", "Searing shot", "Tackle"}, {"Hydro cannon", "Surf", "Water ball", "Tackle"}}
 var attackpower []int = []int{40, 40, 40, 30}
 var attackPowerDB map[string]int
-var availablePorts []int = []int{8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 80089, 8090, 8091}
+var availablePorts []int = []int{8080}
 
 var queue queueID = queueID{}
 
