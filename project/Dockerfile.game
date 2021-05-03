@@ -2,11 +2,11 @@ FROM golang:1.14-alpine AS build
 
 WORKDIR /src/
 
-COPY go.mod /src/
-COPY go.sum /src/
+COPY project/go.mod /src/
+COPY project/go.sum /src/
 RUN go mod download
 
-COPY gameapi /src/gameapi
+COPY project/gameapi /src/gameapi
 COPY project/gameserver/game.go /src/
 RUN CGO_ENABLED=0 go build -o /bin/game
 
