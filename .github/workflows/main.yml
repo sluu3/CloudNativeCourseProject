@@ -13,14 +13,14 @@ jobs:
       id: docker_build_server
       uses: docker/build-push-action@v2
       with:
-        file: ./project/Dockerfile.server
+        file: ./Dockerfile.server
         push: true
         tags: ${{ secrets.DOCKER_HUB_USERNAME }}/pokmonserver:latest
     - name: Build and push game
       id: docker_build_game
       uses: docker/build-push-action@v2
       with:
-        file: ./project/Dockerfile.game
+        file: ./Dockerfile.game
         push: true
         tags: ${{ secrets.DOCKER_HUB_USERNAME }}/pokmongame:latest
     - name: Image digest
