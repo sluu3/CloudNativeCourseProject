@@ -3,25 +3,24 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"time"
-	"fmt"
-	"strconv"
-	"os/exec"
 
 	"project/pokmonapi"
 
-	"google.golang.org/grpc"
 	"go.mongodb.org/mongo-driver/bson"
-    "go.mongodb.org/mongo-driver/bson/primitive"
-    "go.mongodb.org/mongo-driver/mongo"
-    "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"google.golang.org/grpc"
 )
 
 const (
 	port = ":50051"
-	mongodbEndpoint = "mongodb://172.17.0.2:27017" // Find this from the Mongo container
+	//mongodbEndpoint = "mongodb://172.17.0.2:27017" // Find this from the Mongo container
+	mongodbEndpoint = "mongodb://192.168.0.174:30953" // Find this from the Mongo container
 )
 
 type queueID struct {
@@ -41,16 +40,16 @@ type userDatabase struct {
 }
 
 type gameDatabase struct {
-	ID            primitive.ObjectID `bson:"_id"`
-	User1         string             `bson:"user1"`
-	User2         string             `bson:"user2"`
-	Health1       int                `bson:"health1"`
-	Health2       int                `bson:"health2"`
-	WhoseTurn     string             `bson:"whose_turn"`
-	LastAttack    string             `bson:"last_attack"`
-	GamePort      int             `bson:"game_port"`
-	CreatedAt     time.Time          `bson:"created_at"`
-	UpdatedAt     time.Time          `bson:"updated_at"`
+	ID         primitive.ObjectID `bson:"_id"`
+	User1      string             `bson:"user1"`
+	User2      string             `bson:"user2"`
+	Health1    int                `bson:"health1"`
+	Health2    int                `bson:"health2"`
+	WhoseTurn  string             `bson:"whose_turn"`
+	LastAttack string             `bson:"last_attack"`
+	GamePort   int                `bson:"game_port"`
+	CreatedAt  time.Time          `bson:"created_at"`
+	UpdatedAt  time.Time          `bson:"updated_at"`
 }
 
 type monsterDatabase struct {
@@ -67,10 +66,10 @@ type server struct {
 	pokmonapi.UnimplementedPokmonInfoServer
 }
 
-var monsterAttackDB      [][]string = [][]string{{"Leaf blade", "Energy ball", "Apple acid", "Tackle"}, {"Flamethrower", "Blaze kick", "Searing shot", "Tackle"}, {"Hydro cannon", "Surf", "Water ball", "Tackle"}}
-var attackpower          []int      = []int{40, 40, 40, 30}
-var attackPowerDB 		 map[string]int
-var availablePorts       []int = []int{8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 80089, 8090, 8091}
+var monsterAttackDB [][]string = [][]string{{"Leaf blade", "Energy ball", "Apple acid", "Tackle"}, {"Flamethrower", "Blaze kick", "Searing shot", "Tackle"}, {"Hydro cannon", "Surf", "Water ball", "Tackle"}}
+var attackpower []int = []int{40, 40, 40, 30}
+var attackPowerDB map[string]int
+var availablePorts []int = []int{8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 80089, 8090, 8091}
 
 var queue queueID = queueID{}
 
@@ -91,19 +90,19 @@ func (s *server) SetUserName(ctx context.Context, in *pokmonapi.UserName) (*pokm
 	err := col.FindOne(context.TODO(), filter).Decode(&filterUser)
 
 	if err != nil { // user not found in system
-    	// Insert one user
+		// Insert one user
 		col.InsertOne(context.TODO(), &userDatabase{
-			ID:          primitive.NewObjectID(),
-			User:        name,
-			Monster:     "new",
-			CreatedAt:   time.Now(),
+			ID:        primitive.NewObjectID(),
+			User:      name,
+			Monster:   "new",
+			CreatedAt: time.Now(),
 		})
 
 		status.Code = "Set User name. Need monster name"
 
 		return status, nil
 	} else { // user found in system
-		if filterUser.Monster == "new"{ // never added monster to their team
+		if filterUser.Monster == "new" { // never added monster to their team
 			status.Code = "Username in system. Enter monster"
 
 			return status, nil
@@ -129,7 +128,7 @@ func (s *server) GetMonsterInfo(ctx context.Context, in *pokmonapi.MonsterName) 
 		return monsterNames, errors.New("Unable to display the monsters")
 	}
 
-	// Map found monters to an array of monster names 
+	// Map found monters to an array of monster names
 	for foundMonsters.Next(context.TODO()) {
 		monsters := monsterDatabase{}
 		err := foundMonsters.Decode(&monsters)
@@ -162,7 +161,7 @@ func (s *server) SetMonsterInfo(ctx context.Context, in *pokmonapi.UserAndName) 
 	// find one user and one monster
 	var filterUser userDatabase
 	var filterMonster monsterDatabase
-	
+
 	if errM := colMonsters.FindOne(context.TODO(), monsterFilter).Decode(&filterMonster); errM == nil {
 		// the mosnter is in the database
 		if errU := colUsers.FindOne(context.TODO(), userFilter).Decode(&filterUser); errU == nil {
@@ -215,10 +214,10 @@ func (s *server) JoinQueue(ctx context.Context, in *pokmonapi.UserName) (*pokmon
 		if queue.userNames[i] == name {
 			status.Code = "Username is already in the Queue"
 
-			return status, errors.New("Username is already in the Queue")
+			return status, nil
 		}
 	}
-	
+
 	queue.userNames = append(queue.userNames, name)
 	queue.length = queue.length + 1
 
@@ -227,8 +226,7 @@ func (s *server) JoinQueue(ctx context.Context, in *pokmonapi.UserName) (*pokmon
 	return status, nil
 }
 
-
-func (s *server) GetActionInfo(ctx context.Context, in *pokmonapi.RequestInfo ) (*pokmonapi.AttackActions, error) {
+func (s *server) GetActionInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*pokmonapi.AttackActions, error) {
 	name := in.GetName()
 	actions := &pokmonapi.AttackActions{}
 
@@ -281,7 +279,7 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 	// find one user and one monster
 	var filterUser1 userDatabase
 	var filterUser2 userDatabase
-	var filterGame  gameDatabase
+	var filterGame gameDatabase
 
 	time.Sleep(1 * time.Second)
 
@@ -308,7 +306,7 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 				gameStatus.Code = "Game created"
 
 				return gameStatus, nil
-			}else{
+			} else {
 				// error finding user 2
 				gameStatus.Code = "User 2 not found, so game did not create"
 
@@ -332,7 +330,7 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 				gameStatus.Code = "Game created"
 
 				return gameStatus, nil
-			}else{
+			} else {
 				// error finding user 2
 				gameStatus.Code = "User 2 not found, so game did not create"
 
@@ -359,7 +357,7 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 				gameStatus.Code = "Game created"
 
 				return gameStatus, nil
-			}else{
+			} else {
 				// error finding user 2
 				gameStatus.Code = "User 2 not found, so game did not create"
 
@@ -383,7 +381,7 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 				gameStatus.Code = "Game created"
 
 				return gameStatus, nil
-			}else{
+			} else {
 				// error finding user 2
 				gameStatus.Code = "User 2 not found, so game did not create"
 
@@ -395,9 +393,9 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 
 		for queue.length < 2 {
 			// wait for the queue lengh to increase to atleast 2 before creating the game
-		}	
-		fmt.Println(name, " is done wainting for antoher person in queue")	
-	
+		}
+		fmt.Println(name, " is done wainting for antoher person in queue")
+
 		if queue.length >= 2 {
 			if name != queue.userNames[0] {
 				user2Filter := bson.M{"user": bson.M{"$eq": queue.userNames[0]}}
@@ -410,21 +408,21 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 							var filterPort gameDatabase
 
 							if errG := colGames.FindOne(context.TODO(), portFilter).Decode(&filterPort); errG != nil {
-								tempPort = 	availablePorts[i]
+								tempPort = availablePorts[i]
 								break
 							}
 						}
 
 						// Insert one game
 						res, _ := colGames.InsertOne(context.TODO(), &gameDatabase{
-							ID:            primitive.NewObjectID(),
-							User1:         filterUser1.User, 
-							User2:  	   filterUser2.User,
-						    Health1:       filterUser1.Health, 
-							Health2:       filterUser2.Health,
-							WhoseTurn:     filterUser2.User,
-							GamePort:      tempPort,
-							CreatedAt:     time.Now(),
+							ID:        primitive.NewObjectID(),
+							User1:     filterUser1.User,
+							User2:     filterUser2.User,
+							Health1:   filterUser1.Health,
+							Health2:   filterUser2.Health,
+							WhoseTurn: filterUser2.User,
+							GamePort:  tempPort,
+							CreatedAt: time.Now(),
 						})
 
 						gameStatus.OpponentName = filterUser2.User
@@ -436,11 +434,11 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 						gameStatus.GameID = res.InsertedID.(primitive.ObjectID).Hex()
 						gameStatus.GamePort = int32(tempPort)
 
-						port := strconv.Itoa(tempPort) + ":8080"
-						cmd2 := exec.Command("sudo", "docker", "container", "run", "-p", port, "pokmongame")
-						if err := cmd2.Start(); err != nil {
-							log.Fatal(err)
-						}
+						// port := strconv.Itoa(tempPort) + ":8080"
+						// cmd2 := exec.Command("sudo", "docker", "container", "run", "-p", port, "pokmongame")
+						// if err := cmd2.Start(); err != nil {
+						// 	log.Fatal(err)
+						// }
 					}
 				}
 			} else {
@@ -454,21 +452,21 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 							var filterPort gameDatabase
 
 							if errG := colGames.FindOne(context.TODO(), portFilter).Decode(&filterPort); errG != nil {
-								tempPort = 	availablePorts[i]
+								tempPort = availablePorts[i]
 								break
 							}
 						}
 
 						// Insert one game
 						res, _ := colGames.InsertOne(context.TODO(), &gameDatabase{
-							ID:            primitive.NewObjectID(),
-							User1:         filterUser1.User, 
-							User2:  	   filterUser2.User,
-						    Health1:       filterUser1.Health, 
-							Health2:       filterUser2.Health,
-							WhoseTurn:     filterUser1.User,
-							GamePort:      tempPort,
-							CreatedAt:     time.Now(),
+							ID:        primitive.NewObjectID(),
+							User1:     filterUser1.User,
+							User2:     filterUser2.User,
+							Health1:   filterUser1.Health,
+							Health2:   filterUser2.Health,
+							WhoseTurn: filterUser1.User,
+							GamePort:  tempPort,
+							CreatedAt: time.Now(),
 						})
 
 						gameStatus.OpponentName = filterUser2.User
@@ -480,21 +478,21 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 						gameStatus.GameID = res.InsertedID.(primitive.ObjectID).Hex()
 						gameStatus.GamePort = int32(tempPort)
 
-						port :=  strconv.Itoa(tempPort) + ":8080"
-						cmd2 := exec.Command("sudo", "docker", "container", "run", "-p", port, "pokmongame")
-						if err := cmd2.Start(); err != nil {
-							log.Fatal(err)
-						}
+						// port := strconv.Itoa(tempPort) + ":8080"
+						// cmd2 := exec.Command("sudo", "docker", "container", "run", "-p", port, "pokmongame")
+						// if err := cmd2.Start(); err != nil {
+						// 	log.Fatal(err)
+						// }
 					}
 				}
 			}
-	
+
 			// remove the first user from the queue
 			if queue.length > 1 {
 				queue.userNames = queue.userNames[1:queue.length]
 				queue.length = queue.length - 1
 			}
-			// remove the next person from the queue, check to see if there is more than one perosn left 
+			// remove the next person from the queue, check to see if there is more than one perosn left
 			if queue.length > 1 {
 				queue.userNames = queue.userNames[1:queue.length]
 				queue.length = queue.length - 1
@@ -502,13 +500,13 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 				queue.userNames = make([]string, 0)
 				queue.length = 0
 			}
-	
+
 			gameStatus.Code = "Game created"
-	
+
 			return gameStatus, nil
-		} else { 
+		} else {
 			gameStatus.Code = "Error creating the game. Too few players"
-	
+
 			return gameStatus, errors.New("Error creating the game. Too few players")
 		}
 	}
