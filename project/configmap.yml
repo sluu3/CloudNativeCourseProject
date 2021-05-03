@@ -6,3 +6,13 @@ metadata:
     app: mongodb
 data:
   MONGODB: testdb
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pokserver-configuration
+  labels:
+    app: pokmon-server
+data:
+  MONGODB: testdb

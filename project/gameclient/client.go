@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strconv"
 	"time"
 
 	"project/gameapi"
@@ -20,7 +19,8 @@ import (
 
 const (
 	//address = "localhost:50051"      //local
-	address = "192.168.0.174:31187" //kubernetes
+	server_address = "192.168.0.174:31187" //kubernetes
+	game_address   = "192.168.0.174:31061" //kubernetes
 )
 
 type gameID struct {
@@ -45,12 +45,19 @@ func main() {
 	var checkSpelling bool = false
 
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.Dial(server_address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
 
 	server_grpc := pokmonapi.NewPokmonInfoClient(conn)
+
+	// Set up a connection to the server.
+	conn2, err2 := grpc.Dial(game_address, grpc.WithInsecure(), grpc.WithBlock())
+	if err2 != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	game_grpc := gameapi.NewGameInfoClient(conn2)
 
 	// Timeout if server doesn't respond
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
@@ -144,8 +151,8 @@ func main() {
 
 				// set game port
 				//game.gamePort = int(gameStatus.GetGamePort())
-				game.gamePort = 8080
-				fmt.Println(game.gamePort, "\n")
+				//game.gamePort = 31061
+				//fmt.Println(game.gamePort, "\n")
 
 				// set display to setup
 				displayType = "setup"
@@ -158,14 +165,14 @@ func main() {
 				// get the available actions for the user's monster
 				attackActions, err := server_grpc.GetActionInfo(context.TODO(), &pokmonapi.RequestInfo{Name: userName})
 
-				conn.Close()
-				newAddress := "localhost:" + strconv.Itoa(game.gamePort)
+				//conn.Close()
+				//newAddress := "192.168.0.174:" + strconv.Itoa(game.gamePort)
 				// Set up a connection to the game.
-				conn, err := grpc.Dial(newAddress, grpc.WithInsecure(), grpc.WithBlock())
-				if err != nil {
-					log.Fatalf("did not connect: %v", err)
-				}
-				game_grpc := gameapi.NewGameInfoClient(conn)
+				//conn, err := grpc.Dial(newAddress, grpc.WithInsecure(), grpc.WithBlock())
+				//if err != nil {
+				//	log.Fatalf("did not connect: %v", err)
+				//}
+				//game_grpc := gameapi.NewGameInfoClient(conn)
 
 				// pokmon battle happens here as long as no player has 0 or fewer HP
 				for {
@@ -243,7 +250,7 @@ func main() {
 
 				fmt.Println("\nWould you like to play again? \nEnter 'Ready' if you want to rejoin the queue: ")
 
-				conn.Close()
+				//conn.Close()
 
 				for {
 					input.Scan()
@@ -253,15 +260,18 @@ func main() {
 					if readyCheck == "Ready" || readyCheck == "ready" {
 
 						// Set up a connection to the game.
-						conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
-						if err != nil {
-							log.Fatalf("did not connect: %v", err)
-						}
+						//conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+						//if err != nil {
+						//	log.Fatalf("did not connect: %v", err)
+						//}
 
-						server_grpc = pokmonapi.NewPokmonInfoClient(conn)
+						//server_grpc = pokmonapi.NewPokmonInfoClient(conn)
+
+						//time.Sleep(time.Second)
 
 						status, err = server_grpc.JoinQueue(context.TODO(), &pokmonapi.UserName{Name: userName})
-						fmt.Println(status)
+						fmt.Println(status, "\t", err)
+
 						if err == nil {
 							break
 						} else {

@@ -30,3 +30,37 @@ spec:
   resources:
     requests:
       storage: 1Gi
+
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: pokserver-pv
+  labels:
+    app: pokmon-server
+    type: local
+spec:
+  storageClassName: microk8s-hostpath
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/var/data"
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pokserver-pv-claim
+  labels:
+    app: pokmon-server
+spec:
+  storageClassName: microk8s-hostpath
+  capacity:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

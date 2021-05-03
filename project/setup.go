@@ -28,6 +28,19 @@ type userDatabase struct {
 	UpdatedAt   time.Time          `bson:"updated_at"`
 }
 
+type gameDatabase struct {
+	ID         primitive.ObjectID `bson:"_id"`
+	User1      string             `bson:"user1"`
+	User2      string             `bson:"user2"`
+	Health1    int                `bson:"health1"`
+	Health2    int                `bson:"health2"`
+	WhoseTurn  string             `bson:"whose_turn"`
+	LastAttack string             `bson:"last_attack"`
+	GamePort   int                `bson:"game_port"`
+	CreatedAt  time.Time          `bson:"created_at"`
+	UpdatedAt  time.Time          `bson:"updated_at"`
+}
+
 type monsterDatabase struct {
 	ID          primitive.ObjectID `bson:"_id"`
 	Monster     string             `bson:"monster"`
@@ -75,7 +88,16 @@ func main() {
 	var number string
 
 	// connecting to the server with a certain username
-	fmt.Println("1000: setup monster database\n2: delete users and games\n45: delete games\n67: show monsters and moves\n1234567: delete everything\n33: delete monsters\n25: show users in database")
+	fmt.Println("1000: setup monster database\n",
+		"2: delete users and games\n",
+		"45: delete games\n",
+		"67: show monsters and moves\n",
+		"1234567: delete everything\n",
+		"33: delete monsters\n",
+		"25: show users in database\n",
+		"89: show active games",
+	)
+
 	input.Scan()
 	number = input.Text()
 
@@ -127,7 +149,7 @@ func main() {
 			if err != nil {
 				fmt.Printf("Error listing monster")
 			} else {
-				fmt.Printf("Monster: %q\tAttacks: %q\n", monsters.Monster, monsters.AttackMoves)
+				fmt.Printf("Monster: %q\tHealth: %d\tAttacks: %q\n", monsters.Monster, monsters.Health, monsters.AttackMoves)
 			}
 		}
 	case "1234567":
@@ -141,16 +163,34 @@ func main() {
 	case "25":
 		foundUsers, err := colUsers.Find(context.TODO(), bson.D{})
 		if err != nil {
-			fmt.Printf("Error listing monsters")
+			fmt.Printf("Error listing users")
 		}
 		//Map result to varaible
 		for foundUsers.Next(context.TODO()) {
 			users := userDatabase{}
 			err := foundUsers.Decode(&users)
 			if err != nil {
-				fmt.Printf("Error listing monster")
+				fmt.Printf("Error listing user")
 			} else {
-				fmt.Printf("User name: %q\tMonsteer: %q\n", users.User, users.Monster)
+				fmt.Printf("User name: %q\tMonster: %q\tMonster Hp: %d\n", users.User, users.Monster, users.Health)
+			}
+		}
+	case "89":
+		foundGames, err := colGames.Find(context.TODO(), bson.D{})
+		if err != nil {
+			fmt.Printf("Error listing games")
+		}
+		//Map result to varaible
+		for foundGames.Next(context.TODO()) {
+			games := gameDatabase{}
+			err := foundGames.Decode(&games)
+			if err != nil {
+				fmt.Printf("Error listing game")
+			} else {
+				fmt.Printf("Game ID: %q\n", games.ID.String())
+				fmt.Printf("User name 1: %q\tMonster Health: %d\n", games.User1, games.Health1)
+				fmt.Printf("User name 2: %q\tMonster Health: %d\n", games.User2, games.Health2)
+				fmt.Printf("Whose turn: %q\n\n", games.WhoseTurn)
 			}
 		}
 	}

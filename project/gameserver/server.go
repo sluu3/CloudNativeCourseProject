@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os/exec"
-	"strconv"
 	"time"
 
 	"project/pokmonapi"
@@ -216,7 +214,7 @@ func (s *server) JoinQueue(ctx context.Context, in *pokmonapi.UserName) (*pokmon
 		if queue.userNames[i] == name {
 			status.Code = "Username is already in the Queue"
 
-			return status, errors.New("Username is already in the Queue")
+			return status, nil
 		}
 	}
 
@@ -436,11 +434,11 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 						gameStatus.GameID = res.InsertedID.(primitive.ObjectID).Hex()
 						gameStatus.GamePort = int32(tempPort)
 
-						port := strconv.Itoa(tempPort) + ":8080"
-						cmd2 := exec.Command("sudo", "docker", "container", "run", "-p", port, "pokmongame")
-						if err := cmd2.Start(); err != nil {
-							log.Fatal(err)
-						}
+						// port := strconv.Itoa(tempPort) + ":8080"
+						// cmd2 := exec.Command("sudo", "docker", "container", "run", "-p", port, "pokmongame")
+						// if err := cmd2.Start(); err != nil {
+						// 	log.Fatal(err)
+						// }
 					}
 				}
 			} else {
@@ -480,11 +478,11 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 						gameStatus.GameID = res.InsertedID.(primitive.ObjectID).Hex()
 						gameStatus.GamePort = int32(tempPort)
 
-						port := strconv.Itoa(tempPort) + ":8080"
-						cmd2 := exec.Command("sudo", "docker", "container", "run", "-p", port, "pokmongame")
-						if err := cmd2.Start(); err != nil {
-							log.Fatal(err)
-						}
+						// port := strconv.Itoa(tempPort) + ":8080"
+						// cmd2 := exec.Command("sudo", "docker", "container", "run", "-p", port, "pokmongame")
+						// if err := cmd2.Start(); err != nil {
+						// 	log.Fatal(err)
+						// }
 					}
 				}
 			}

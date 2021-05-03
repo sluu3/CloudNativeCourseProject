@@ -3,24 +3,25 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
-	"net"
-	"math/rand"
-	"time"
 	"fmt"
+	"log"
+	"math/rand"
+	"net"
+	"time"
 
 	"project/gameapi"
 
-	"google.golang.org/grpc"
 	"go.mongodb.org/mongo-driver/bson"
-    "go.mongodb.org/mongo-driver/bson/primitive"
-    "go.mongodb.org/mongo-driver/mongo"
-    "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"google.golang.org/grpc"
 )
 
 const (
 	port = ":8080"
-	mongodbEndpoint = "mongodb://172.17.0.2:27017" // Find this from the Mongo container
+	//mongodbEndpoint = "mongodb://172.17.0.2:27017" // Find this from the Mongo container
+	mongodbEndpoint = "mongodb://192.168.0.174:30953" // Find this from the Mongo container
 )
 
 type userDatabase struct {
@@ -35,16 +36,16 @@ type userDatabase struct {
 }
 
 type gameDatabase struct {
-	ID            primitive.ObjectID `bson:"_id"`
-	User1         string             `bson:"user1"`
-	User2         string             `bson:"user2"`
-	Health1       int                `bson:"health1"`
-	Health2       int                `bson:"health2"`
-	WhoseTurn     string             `bson:"whose_turn"`
-	LastAttack    string             `bson:"last_attack"`
-	GamePort      int                `bson:"game_port"`
-	CreatedAt     time.Time          `bson:"created_at"`
-	UpdatedAt     time.Time          `bson:"updated_at"`
+	ID         primitive.ObjectID `bson:"_id"`
+	User1      string             `bson:"user1"`
+	User2      string             `bson:"user2"`
+	Health1    int                `bson:"health1"`
+	Health2    int                `bson:"health2"`
+	WhoseTurn  string             `bson:"whose_turn"`
+	LastAttack string             `bson:"last_attack"`
+	GamePort   int                `bson:"game_port"`
+	CreatedAt  time.Time          `bson:"created_at"`
+	UpdatedAt  time.Time          `bson:"updated_at"`
 }
 
 type monsterDatabase struct {
@@ -61,9 +62,9 @@ type server struct {
 	gameapi.UnimplementedGameInfoServer
 }
 
-var monsterAttackDB      [][]string = [][]string{{"Leaf blade", "Energy ball", "Apple acid", "Tackle"}, {"Flamethrower", "Blaze kick", "Searing shot", "Tackle"}, {"Hydro cannon", "Surf", "Water ball", "Tackle"}}
-var attackpower          []int      = []int{40, 40, 40, 30}
-var attackPowerDB 		 map[string]int
+var monsterAttackDB [][]string = [][]string{{"Leaf blade", "Energy ball", "Apple acid", "Tackle"}, {"Flamethrower", "Blaze kick", "Searing shot", "Tackle"}, {"Hydro cannon", "Surf", "Water ball", "Tackle"}}
+var attackpower []int = []int{40, 40, 40, 30}
+var attackPowerDB map[string]int
 
 var client *mongo.Client
 
@@ -81,7 +82,7 @@ func (s *server) GetHealthPoints(ctx context.Context, in *gameapi.HealthRequest)
 	gameFilter := bson.M{"_id": bson.M{"$eq": objectID}}
 
 	// find one user and one monster
-	var filterGame  gameDatabase
+	var filterGame gameDatabase
 	var tempHealth int
 
 	errG := colGames.FindOne(context.TODO(), gameFilter).Decode(&filterGame)
@@ -94,7 +95,7 @@ func (s *server) GetHealthPoints(ctx context.Context, in *gameapi.HealthRequest)
 		}
 
 		var check bool = true
-		for check == true{
+		for check == true {
 			// wait for the opponent to make its move
 			time.Sleep(2 * time.Second)
 			colGames.FindOne(context.TODO(), gameFilter).Decode(&filterGame)
@@ -110,7 +111,7 @@ func (s *server) GetHealthPoints(ctx context.Context, in *gameapi.HealthRequest)
 			healthPoints.Health = int32(filterGame.Health1)
 			tempHealth = tempHealth - filterGame.Health1
 		}
-		
+
 		healthPoints.WhoseTurn = filterGame.WhoseTurn
 		healthPoints.LastAttack = filterGame.LastAttack
 		healthPoints.Damage = int32(tempHealth)
@@ -156,7 +157,7 @@ func (s *server) MonsterAttack(ctx context.Context, in *gameapi.MonsterAction) (
 	// find one user and one monster
 	var filterUser1 userDatabase
 	var filterUser2 userDatabase
-	var filterGame  gameDatabase
+	var filterGame gameDatabase
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -167,7 +168,7 @@ func (s *server) MonsterAttack(ctx context.Context, in *gameapi.MonsterAction) (
 			if errU := colUsers.FindOne(context.TODO(), user1Filter).Decode(&filterUser1); errU == nil {
 				if errU := colUsers.FindOne(context.TODO(), user2Filter).Decode(&filterUser2); errU == nil {
 					var randMax int
-					
+
 					randMax = elementDamage(filterUser1.Element, filterUser2.Element, action)
 
 					healthLoss := rand.Intn(randMax)
@@ -178,7 +179,7 @@ func (s *server) MonsterAttack(ctx context.Context, in *gameapi.MonsterAction) (
 
 					if tempHealth < 0 {
 						tempHealth = 0
-					} 
+					}
 
 					healthPoints.Health = int32(tempHealth)
 					// upadter for specified item and price
@@ -205,7 +206,7 @@ func (s *server) MonsterAttack(ctx context.Context, in *gameapi.MonsterAction) (
 			if errU := colUsers.FindOne(context.TODO(), user1Filter).Decode(&filterUser1); errU == nil {
 				if errU := colUsers.FindOne(context.TODO(), user2Filter).Decode(&filterUser2); errU == nil {
 					var randMax int
-					
+
 					randMax = elementDamage(filterUser1.Element, filterUser2.Element, action)
 
 					healthLoss := rand.Intn(randMax)
@@ -216,8 +217,8 @@ func (s *server) MonsterAttack(ctx context.Context, in *gameapi.MonsterAction) (
 
 					if tempHealth < 0 {
 						tempHealth = 0
-					} 
-					
+					}
+
 					// upadter for specified item and price
 					updater := bson.M{"$set": bson.M{"health1": filterGame.Health1, "health2": tempHealth, "whose_turn": filterGame.User2, "last_attack": action, "updated_at": time.Now()}}
 
@@ -227,7 +228,7 @@ func (s *server) MonsterAttack(ctx context.Context, in *gameapi.MonsterAction) (
 
 					if err == nil {
 						healthPoints.WhoseTurn = filterGame.User2
-						healthPoints.Health = int32( filterGame.Health2)
+						healthPoints.Health = int32(filterGame.Health2)
 						healthPoints.LastAttack = action
 						healthPoints.Damage = int32(healthLoss)
 
@@ -245,39 +246,39 @@ func (s *server) MonsterAttack(ctx context.Context, in *gameapi.MonsterAction) (
 	return healthPoints, errors.New("Error getting Health and whose turn")
 }
 
-func elementDamage(myType string, oppType string, action string) int{
+func elementDamage(myType string, oppType string, action string) int {
 	switch myType {
 	case "Grass":
 		switch oppType {
 		case "Grass":
 			return int(attackPowerDB[action])
 		case "Fire":
-			return int(attackPowerDB[action])/2
+			return int(attackPowerDB[action]) / 2
 		case "Water":
-			return int(attackPowerDB[action])*2
+			return int(attackPowerDB[action]) * 2
 		}
 	case "Fire":
 		switch oppType {
 		case "Grass":
-			return int(attackPowerDB[action])*2
+			return int(attackPowerDB[action]) * 2
 		case "Fire":
 			return int(attackPowerDB[action])
 		case "Water":
-			return int(attackPowerDB[action])/2
+			return int(attackPowerDB[action]) / 2
 		}
 	case "Water":
 		switch oppType {
 		case "Grass":
-			return int(attackPowerDB[action])/2
+			return int(attackPowerDB[action]) / 2
 		case "Fire":
-			return int(attackPowerDB[action])*2
+			return int(attackPowerDB[action]) * 2
 		case "Water":
 			return int(attackPowerDB[action])
 		}
 	default:
 		return 0
 	}
-	
+
 	return 0
 }
 
