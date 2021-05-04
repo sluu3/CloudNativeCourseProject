@@ -177,6 +177,8 @@ func main() {
 				//}
 				//game_grpc := gameapi.NewGameInfoClient(conn)
 
+				time.Sleep(1 * time.Second)
+
 				// pokmon battle happens here as long as no player has 0 or fewer HP
 				for {
 					// check to see if you start first
@@ -257,39 +259,38 @@ func main() {
 
 				//conn.Close()
 
-				// for {
-				// 	input.Scan()
-				// 	readyCheck = input.Text()
-				// 	//readyCheck, _ = reader.ReadString('\n')
+				for {
+					input.Scan()
+					readyCheck = input.Text()
+					//readyCheck, _ = reader.ReadString('\n')
 
-				// 	if readyCheck == "Ready" || readyCheck == "ready" {
+					if readyCheck == "Ready" || readyCheck == "ready" {
 
-				// 		// Set up a connection to the game.
-				// 		//conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
-				// 		//if err != nil {
-				// 		//	log.Fatalf("did not connect: %v", err)
-				// 		//}
+						// Set up a connection to the game.
+						//conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+						//if err != nil {
+						//	log.Fatalf("did not connect: %v", err)
+						//}
 
-				// 		//server_grpc = pokmonapi.NewPokmonInfoClient(conn)
+						//server_grpc = pokmonapi.NewPokmonInfoClient(conn)
 
-				// 		//time.Sleep(time.Second)
+						//time.Sleep(time.Second)
 
-				// 		status, err = server_grpc.JoinQueue(context.TODO(), &pokmonapi.UserName{Name: userName})
-				// 		fmt.Println(status)
+						status, err = server_grpc.JoinQueue(context.TODO(), &pokmonapi.UserName{Name: userName})
+						fmt.Println(status)
 
-				// 		if err == nil {
-				// 			break
-				// 		} else {
-				// 			fmt.Println("something went really wrong, you should be scared")
-				// 		}
-				// 	} else if readyCheck == "Quit" || readyCheck == "quit" {
-				// 		return
-				// 	}
+						if err == nil {
+							break
+						} else {
+							fmt.Println("something went really wrong, you should be scared")
+						}
+					} else if readyCheck == "Quit" || readyCheck == "quit" {
+						return
+					}
 
-				// 	fmt.Println("Please enter 'Ready' if you want to join the queue")
-				// }
+					fmt.Println("Please enter 'Ready' if you want to join the queue")
+				}
 
-				status, err = server_grpc.JoinQueue(context.TODO(), &pokmonapi.UserName{Name: userName})
 			}
 		}
 	}

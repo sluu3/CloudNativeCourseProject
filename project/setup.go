@@ -53,7 +53,7 @@ type monsterDatabase struct {
 
 var monsterNamesDB []string = []string{"Bulbasaur", "Charmander", "Squirtle", "Chikorita", "Cyndaquil", "Totodile", "Treecko", "Torchic", "Mudkip", "Turtwig", "Chimchar", "Piplup"}
 var monsterAttackDB [][]string = [][]string{{"Leaf blade", "Energy ball", "Apple acid", "Tackle"}, {"Flamethrower", "Blaze kick", "Searing shot", "Tackle"}, {"Hydro cannon", "Surf", "Water ball", "Tackle"}}
-var monsterHealthDB []int = []int{900, 780, 880, 900, 780, 880, 800, 900, 1000, 1100, 880, 1060} // twice the amount they had in pokemon
+var monsterHealthDB []int = []int{1490, 1478, 1488, 1490, 1478, 1488, 1480, 1390, 1410, 1310, 1488, 1206} // twice the amount they had in pokemon
 var monsterElementDB []string = []string{"Grass", "Fire", "Water"}
 var attackpower []int = []int{40, 40, 40, 30}
 var attackPowerDB map[string]int
