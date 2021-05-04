@@ -267,6 +267,11 @@ func (s *server) GetGameInfo(ctx context.Context, in *pokmonapi.RequestInfo) (*p
 	name := in.GetName()
 	gameStatus := &pokmonapi.GameStatus{}
 
+	// sleep if not first personn because need to wait for game to be created
+	if queue.userNames[0] != name {
+		time.Sleep(1 * time.Second)
+	}
+
 	// select collection from database
 	colUsers := client.Database("Pokmon").Collection("users")
 	colGames := client.Database("Pokmon").Collection("games")
